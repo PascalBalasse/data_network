@@ -1280,6 +1280,19 @@ void GraphView::mouseReleaseEvent(QMouseEvent* event)
     QGraphicsView::mouseReleaseEvent(event);
 }
 
+void GraphView::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    QPointF scenePos = mapToScene(event->pos());
+    QGraphicsItem* item = scene()->itemAt(scenePos, QTransform());
+
+    if (item && item->data(0).isValid()) {
+        QUuid nodeId(item->data(0).toString());
+        emit editNodeRequested(nodeId);
+    } else {
+        QGraphicsView::mouseDoubleClickEvent(event);
+    }
+}
+
 void GraphView::mouseMoveEvent(QMouseEvent* event)
 {
     if (m_isDragging && m_nodes.contains(m_draggingNodeId)) {
@@ -1457,8 +1470,6 @@ void GraphView::showNodeContextMenu(const QUuid& nodeId, const QPoint& globalPos
         contextMenu.addSeparator();
 
         // Actions communes à tous les nœuds
-        QAction* renameAction = contextMenu.addAction(tr("Renommer"));
-        QAction* duplicateAction = contextMenu.addAction(tr("Dupliquer"));
         QAction* deleteAction = contextMenu.addAction(tr("Supprimer"));
 
         contextMenu.addSeparator();
@@ -1505,14 +1516,6 @@ void GraphView::showNodeContextMenu(const QUuid& nodeId, const QPoint& globalPos
         }
 
         // Connecter les actions
-        connect(renameAction, &QAction::triggered, [this, nodeId]() {
-            emit renameNodeRequested(nodeId);
-        });
-
-        connect(duplicateAction, &QAction::triggered, [this, nodeId]() {
-            emit duplicateNodeRequested(nodeId);
-        });
-
         connect(deleteAction, &QAction::triggered, [this, nodeId]() {
             emit deleteNodeRequested(nodeId);
         });

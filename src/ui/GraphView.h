@@ -150,6 +150,7 @@ namespace dn::ui {
         void keyPressEvent(QKeyEvent* event) override;
         void contextMenuEvent(QContextMenuEvent* event) override;
         void resizeEvent(QResizeEvent* event) override;
+        void mouseDoubleClickEvent(QMouseEvent* event) override;
     private:
         //══════════════════════════════════════════════════════════════════
         // Layout automatique
