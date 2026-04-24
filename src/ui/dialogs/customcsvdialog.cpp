@@ -19,9 +19,10 @@
 using namespace dn::dialogs;
 
 /// Constructeur
-CustomCSVDialog::CustomCSVDialog(ConnectorMode mode, QWidget *parent)
+CustomCSVDialog::CustomCSVDialog(ConnectorMode mode, const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
     , m_mode(mode)
+    , m_defaultNodeName(defaultNodeName)
     , m_accepted(false)
 {
     setupUI();
@@ -42,6 +43,16 @@ void CustomCSVDialog::setupUI()
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
+    // === Nom du noeud ===
+    m_nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(m_nameLabel);
+
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setPlaceholderText("Nom du nœud CSV");
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
+
     // === Groupe d'information selon le mode ===
   //  QGroupBox *infoGroup = new QGroupBox(this);
   //  QVBoxLayout *infoLayout = new QVBoxLayout(infoGroup);
@@ -49,8 +60,8 @@ void CustomCSVDialog::setupUI()
  //   mainLayout->addWidget(infoGroup);
 
     // === Sélection du fichier ===
-    QLabel *fileLabel = new QLabel(this);
-    mainLayout->addWidget(fileLabel);
+    m_fileLabel = new QLabel(this);
+    mainLayout->addWidget(m_fileLabel);
 
     QHBoxLayout *fileLayout = new QHBoxLayout();
     m_fileEdit = new QLineEdit(this);
@@ -150,12 +161,11 @@ void CustomCSVDialog::setupUI()
 
 void CustomCSVDialog::updateUIForMode()
 {
-    QLabel *fileLabel = findChild<QLabel*>();
-    if (fileLabel) {
+    if (m_fileLabel) {
         if (m_mode == ConnectorMode::Read) {
-            fileLabel->setText("<b>Fichier CSV à charger :</b>");
+            m_fileLabel->setText("<b>Fichier CSV à charger :</b>");
         } else {
-            fileLabel->setText("<b>Fichier CSV de destination :</b>");
+            m_fileLabel->setText("<b>Fichier CSV de destination :</b>");
         }
     }
 }
@@ -277,6 +287,7 @@ void CustomCSVDialog::validateAndAccept()
 
     // Stocker les paramètres
     m_params.clear();
+    m_params["nodeName"] = m_nameEdit->text().trimmed();
     m_params["fileName"] = m_fileEdit->text();
     m_params["hasHeader"] = m_headerCheck->isChecked();
     m_params["separator"] = m_sepCombo->currentData().toString();
@@ -304,9 +315,9 @@ QMap<QString, QVariant> CustomCSVDialog::getParameters() const
 }
 
 // Méthodes statiques
-QMap<QString, QVariant> CustomCSVDialog::getCSVReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomCSVDialog::getCSVReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomCSVDialog dialog(ConnectorMode::Read, parent);
+    CustomCSVDialog dialog(ConnectorMode::Read, defaultNodeName, parent);
 
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();
@@ -315,9 +326,9 @@ QMap<QString, QVariant> CustomCSVDialog::getCSVReadParameters(QWidget *parent)
     return QMap<QString, QVariant>();
 }
 
-QMap<QString, QVariant> CustomCSVDialog::getCSVWriteParameters(QWidget *parent)
+QMap<QString, QVariant> CustomCSVDialog::getCSVWriteParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomCSVDialog dialog(ConnectorMode::Write, parent);
+    CustomCSVDialog dialog(ConnectorMode::Write, defaultNodeName, parent);
 
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();

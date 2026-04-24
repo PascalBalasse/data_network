@@ -32,12 +32,16 @@ namespace dn::dialogs {
         Q_OBJECT
 
     public:
-        explicit CustomXMLDialog(ConnectorMode mode = ConnectorMode::Read, QWidget *parent = nullptr);
+        explicit CustomXMLDialog(ConnectorMode mode = ConnectorMode::Read,
+                                 const QString& defaultNodeName = QString(),
+                                 QWidget *parent = nullptr);
 
         QMap<QString, QVariant> getParameters() const;
 
-        static QMap<QString, QVariant> getXMLReadParameters(QWidget *parent = nullptr);
-        static QMap<QString, QVariant> getXMLWriteParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getXMLReadParameters(QWidget *parent = nullptr,
+                                                            const QString& defaultNodeName = "XML Source");
+        static QMap<QString, QVariant> getXMLWriteParameters(QWidget *parent = nullptr,
+                                                             const QString& defaultNodeName = "XML Target");
 
         ConnectorMode getMode() const { return m_mode; }
 
@@ -51,6 +55,9 @@ namespace dn::dialogs {
         void validateAndAccept();
         void updateUIForMode();
 
+        QLabel *m_nameLabel;
+        QLabel *m_fileLabel;
+        QLineEdit *m_nameEdit;
         QLineEdit *m_fileEdit;
         QLineEdit *m_rootEdit;
         QLineEdit *m_rowEdit;
@@ -59,6 +66,7 @@ namespace dn::dialogs {
 
         QMap<QString, QVariant> m_params;
         ConnectorMode m_mode;
+        QString m_defaultNodeName;
         bool m_accepted;
     };
 

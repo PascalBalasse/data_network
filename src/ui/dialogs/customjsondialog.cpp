@@ -16,9 +16,10 @@
 using namespace dn::dialogs;
 
 /// Constructeur
-CustomJSONDialog::CustomJSONDialog(ConnectorMode mode, QWidget *parent)
+CustomJSONDialog::CustomJSONDialog(ConnectorMode mode, const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
     , m_mode(mode)
+    , m_defaultNodeName(defaultNodeName)
     , m_accepted(false)
 {
     setupUI();
@@ -38,9 +39,17 @@ void CustomJSONDialog::setupUI()
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
+    m_nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(m_nameLabel);
+
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
+
     // === Sélection du fichier ===
-    QLabel *fileLabel = new QLabel("Fichier:", this);
-    mainLayout->addWidget(fileLabel);
+    m_fileLabel = new QLabel("Fichier:", this);
+    mainLayout->addWidget(m_fileLabel);
 
     QHBoxLayout *fileLayout = new QHBoxLayout();
     m_fileEdit = new QLineEdit(this);
@@ -85,6 +94,14 @@ void CustomJSONDialog::setupUI()
 
 void CustomJSONDialog::updateUIForMode()
 {
+    if (m_fileLabel) {
+        if (m_mode == ConnectorMode::Read) {
+            m_fileLabel->setText("<b>Fichier JSON à charger :</b>");
+        } else {
+            m_fileLabel->setText("<b>Fichier JSON de destination :</b>");
+        }
+    }
+
     if (m_mode == ConnectorMode::Read) {
         setWindowTitle("Chargement d'un fichier JSON");
     } else {
@@ -131,6 +148,7 @@ void CustomJSONDialog::validateAndAccept()
     }
 
     m_params["fileName"] = fileName;
+    m_params["nodeName"] = m_nameEdit->text().trimmed();
     if (m_mode == ConnectorMode::Write) {
         m_params["prettyPrint"] = m_prettyPrintCheck->isChecked();
     }
@@ -142,18 +160,18 @@ QMap<QString, QVariant> CustomJSONDialog::getParameters() const
     return m_params;
 }
 
-QMap<QString, QVariant> CustomJSONDialog::getJSONReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomJSONDialog::getJSONReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomJSONDialog dialog(ConnectorMode::Read, parent);
+    CustomJSONDialog dialog(ConnectorMode::Read, defaultNodeName, parent);
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();
     }
     return QMap<QString, QVariant>();
 }
 
-QMap<QString, QVariant> CustomJSONDialog::getJSONWriteParameters(QWidget *parent)
+QMap<QString, QVariant> CustomJSONDialog::getJSONWriteParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomJSONDialog dialog(ConnectorMode::Write, parent);
+    CustomJSONDialog dialog(ConnectorMode::Write, defaultNodeName, parent);
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();
     }

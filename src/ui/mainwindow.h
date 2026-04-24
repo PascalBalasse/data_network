@@ -80,6 +80,7 @@ void onLoadXMLData();
     void onGraphNodeSelected(const QUuid& nodeId);
     void onNetworkChanged();
     void onTableRowSelected(const QModelIndex &current, const QModelIndex &previous);
+    void onTableContextMenuRequested(const QPoint& pos);
 
     void updateTablePreview(const dn::core::DataTable& table);
 
@@ -117,6 +118,9 @@ private:
     void setUiEnabled(bool enabled);
     bool checkNodeSelected(const QString& errorMessage = "Veuillez d'abord charger des données ou sélectionner un nœud.");
     bool checkNodeHasData(const QString& errorMessage = "Le nœud sélectionné ne contient pas de données.");
+    QList<int> selectedTableColumns() const;
+    QString columnTypeToLabel(dn::core::ColumnType type) const;
+    void applyTypeToSelectedColumns(dn::core::ColumnType type);
 
     //══════════════════════════════════════════════════════════════════
     // Opérations de lecture/écriture

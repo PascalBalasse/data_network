@@ -30,11 +30,13 @@ namespace dn::dialogs {
         Q_OBJECT
 
     public:
-        explicit CustomWebDialog(QWidget *parent = nullptr);
+        explicit CustomWebDialog(const QString& defaultNodeName = QString(),
+                                 QWidget *parent = nullptr);
 
         QMap<QString, QVariant> getParameters() const;
 
-        static QMap<QString, QVariant> getWebReadParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getWebReadParameters(QWidget *parent = nullptr,
+                                                            const QString& defaultNodeName = "Web Source");
 
     private slots:
         void onAccept();
@@ -43,11 +45,13 @@ namespace dn::dialogs {
     private:
         void setupUI();
 
+        QLineEdit *m_nameEdit;
         QLineEdit *m_urlEdit;
         QSpinBox *m_tableIndexSpin;
         QPushButton *m_okButton;
 
         QMap<QString, QVariant> m_params;
+        QString m_defaultNodeName;
         bool m_accepted;
     };
 

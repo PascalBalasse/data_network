@@ -34,16 +34,20 @@ namespace dn::dialogs{
         Q_OBJECT
 
     public:
-        explicit CustomCSVDialog(ConnectorMode mode = ConnectorMode::Read, QWidget *parent = nullptr);
+        explicit CustomCSVDialog(ConnectorMode mode = ConnectorMode::Read,
+                                 const QString& defaultNodeName = QString(),
+                                 QWidget *parent = nullptr);
 
         /// Retourne les paramètres configurés
         QMap<QString, QVariant> getParameters() const;
 
         /// Affiche le dialogue en mode lecture
-        static QMap<QString, QVariant> getCSVReadParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getCSVReadParameters(QWidget *parent = nullptr,
+                                                            const QString& defaultNodeName = "CSV Source");
 
         /// Affiche le dialogue en mode écriture
-        static QMap<QString, QVariant> getCSVWriteParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getCSVWriteParameters(QWidget *parent = nullptr,
+                                                             const QString& defaultNodeName = "CSV Target");
 
         /// Retourne le mode
         ConnectorMode getMode() const { return m_mode; }
@@ -61,7 +65,10 @@ namespace dn::dialogs{
         //══════════════════════════════════════════════════════════════════
         // Widgets
         //══════════════════════════════════════════════════════════════════
+        QLabel *m_nameLabel;
+        QLabel *m_fileLabel;
         QLineEdit *m_fileEdit;
+        QLineEdit *m_nameEdit;
         QCheckBox *m_headerCheck;
         QComboBox *m_sepCombo;
         QPushButton *m_okButton;
@@ -72,6 +79,7 @@ namespace dn::dialogs{
         //══════════════════════════════════════════════════════════════════
         QMap<QString, QVariant> m_params;
         ConnectorMode m_mode;
+        QString m_defaultNodeName;
         bool m_accepted;
     };
 

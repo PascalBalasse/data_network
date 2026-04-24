@@ -32,13 +32,15 @@ namespace dn::dialogs{
         Q_OBJECT
 
     public:
-        explicit CustomSQLDialog(QWidget *parent = nullptr);
+        explicit CustomSQLDialog(const QString& defaultNodeName = QString(),
+                                 QWidget *parent = nullptr);
 
         /// Retourne les paramètres
         QMap<QString, QVariant> getParameters() const;
 
         /// Affiche le dialogue
-        static QMap<QString, QVariant> getSQLReadParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getSQLReadParameters(QWidget *parent = nullptr,
+                                                            const QString& defaultNodeName = "SQL Source");
 
     private slots:
         void onDatabaseTypeChanged(int index);
@@ -48,6 +50,7 @@ namespace dn::dialogs{
         //══════════════════════════════════════════════════════════════════
         // Widgets
         //══════════════════════════════════════════════════════════════════
+        QLineEdit *m_nameEdit;
         QComboBox *m_dbTypeCombo;
         QLineEdit *m_hostEdit;
         QLineEdit *m_portEdit;
@@ -58,6 +61,7 @@ namespace dn::dialogs{
         QLineEdit *m_sqlQueryEdit;
         QPushButton *m_okButton;
         QPushButton *m_testButton;
+        QString m_defaultNodeName;
     };
 
 }

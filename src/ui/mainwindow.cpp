@@ -42,6 +42,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QMenu>
+#include <QHeaderView>
 
 using namespace dn::ui;
 using namespace dn::dialogs;
@@ -72,6 +74,8 @@ MainWindow::MainWindow(QWidget *parent)
     //instanciation du model pour la TableView
     m_tableModel = std::make_unique<DataTableModel>(this);
     ui->tableView->setModel(m_tableModel.get());
+    ui->tableView->setSelectionBehavior(QAbstractItemView::SelectColumns);
+    ui->tableView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     auto* header = new TwoLineHeader(Qt::Horizontal, ui->tableView);
     ui->tableView->setHorizontalHeader(header);
@@ -97,6 +101,8 @@ void MainWindow::setupConnections(){
             this, &MainWindow::onRenameColumns);
     connect(ui->tableView->selectionModel(), &QItemSelectionModel::currentChanged,
            this, &MainWindow::onTableRowSelected);
+    connect(ui->tableView, &QWidget::customContextMenuRequested,
+            this, &MainWindow::onTableContextMenuRequested);
 
     // Connexion des signaux émis par le réseau
     connect(&m_network, &Network::nodeAdded, this, &MainWindow::onNodeAdded);
@@ -410,9 +416,74 @@ void MainWindow::onTableRowSelected(const QModelIndex &current, const QModelInde
     statusBar()->showMessage(QString("Valeur: %1").arg(value.toString()), 2000);
 }
 
+void MainWindow::onTableContextMenuRequested(const QPoint& pos)
+{
+    QMenu contextMenu(this);
+    QAction* titleAction = contextMenu.addAction(tr("Menu colonnes (bientot disponible)"));
+    titleAction->setEnabled(false);
+    contextMenu.addSeparator();
+    QAction* placeholderAction = contextMenu.addAction(tr("Action factice"));
+    placeholderAction->setEnabled(false);
+
+    contextMenu.exec(ui->tableView->viewport()->mapToGlobal(pos));
+}
+
 void MainWindow::updateTablePreview(const DataTable& table)
 {
     m_tableModel->setTable(&table);
+}
+
+QList<int> MainWindow::selectedTableColumns() const
+{
+    QList<int> columns;
+    if (!ui->tableView->selectionModel())
+        return columns;
+
+    const QModelIndexList selectedIndexes = ui->tableView->selectionModel()->selectedColumns();
+    for (const QModelIndex& index : selectedIndexes) {
+        if (index.isValid()) {
+            columns.append(index.column());
+        }
+    }
+    return columns;
+}
+
+QString MainWindow::columnTypeToLabel(ColumnType type) const
+{
+    switch (type) {
+    case ColumnType::Integer: return tr("Entier");
+    case ColumnType::Double: return tr("Décimal");
+    case ColumnType::Boolean: return tr("Booléen");
+    case ColumnType::Date: return tr("Date");
+    case ColumnType::DateTime: return tr("Date et heure");
+    case ColumnType::List: return tr("Liste");
+    case ColumnType::Pair: return tr("Paire");
+    case ColumnType::Table: return tr("Table");
+    case ColumnType::Any: return tr("Mixte");
+    default: return tr("Texte");
+    }
+}
+
+void MainWindow::applyTypeToSelectedColumns(ColumnType type)
+{
+    if (!m_selectedNode)
+        return;
+
+    const QList<int> columns = selectedTableColumns();
+    if (columns.isEmpty()) {
+        statusBar()->showMessage(tr("Aucune colonne sélectionnée."), 2000);
+        return;
+    }
+
+    DataTable& mutableTable = const_cast<DataTable&>(m_selectedNode->getCachedResult());
+    for (int col : columns) {
+        mutableTable.forceColumnType(col, type, true);
+    }
+
+    m_tableModel->setTable(&mutableTable);
+    statusBar()->showMessage(
+        tr("Type appliqué à %1 colonne(s): %2").arg(columns.size()).arg(columnTypeToLabel(type)),
+        3000);
 }
 
 
@@ -714,7 +785,10 @@ void MainWindow::doReadCSV()
     connector->configure(params);
 
     // === ÉTAPE 3 : Créer le SourceNode ===
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "CSV Source");
+    const QString nodeName = params.value("nodeName", "CSV Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(
+        std::move(connector),
+        nodeName.isEmpty() ? QString("CSV Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -750,7 +824,11 @@ void MainWindow::doWriteCSV(){
     connector->configure(params);
 
     // === ÉTAPE 3 : Créer le SourceNode ===
-    auto* targetNode = m_network.createTargetNode(std::move(connector), m_selectedNode, "CSV Target");
+    const QString nodeName = params.value("nodeName", "CSV Target").toString().trimmed();
+    auto* targetNode = m_network.createTargetNode(
+        std::move(connector),
+        m_selectedNode,
+        nodeName.isEmpty() ? QString("CSV Target") : nodeName);
 
     connect(targetNode, &RuntimeNode::tableChanged, this, &MainWindow::onNodeTableChanged);
     connect(targetNode, &TargetNode::exportCompleted, this, &MainWindow::onExportCompleted);
@@ -785,7 +863,9 @@ void MainWindow::doReadTXT()
     auto connector = std::make_unique<TXTConnector>(this);
     connector->configure(params);
 
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "TXT Source");
+    const QString nodeName = params.value("nodeName", "TXT Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("TXT Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -831,7 +911,9 @@ void MainWindow::doWriteTXT(){
     auto connector = std::make_unique<TXTConnector>(this);
     connector->configure(params);
 
-    auto* targetNode = m_network.createTargetNode(std::move(connector), m_selectedNode, "TXT Target");
+    const QString nodeName = params.value("nodeName", "TXT Target").toString().trimmed();
+    auto* targetNode = m_network.createTargetNode(std::move(connector), m_selectedNode,
+                                                  nodeName.isEmpty() ? QString("TXT Target") : nodeName);
 
     connect(targetNode, &RuntimeNode::tableChanged, this, &MainWindow::onNodeTableChanged);
     connect(targetNode, &TargetNode::exportCompleted, this, &MainWindow::onExportCompleted);
@@ -879,7 +961,9 @@ void MainWindow::doWriteExcel(){
     auto connector = std::make_unique<ExcelConnector>(this);
     connector->configure(params);
 
-    auto* targetNode = m_network.createTargetNode(std::move(connector), m_selectedNode, "Excel Target");
+    const QString nodeName = params.value("nodeName", "Excel Target").toString().trimmed();
+    auto* targetNode = m_network.createTargetNode(std::move(connector), m_selectedNode,
+                                                  nodeName.isEmpty() ? QString("Excel Target") : nodeName);
 
     connect(targetNode, &RuntimeNode::tableChanged, this, &MainWindow::onNodeTableChanged);
     connect(targetNode, &TargetNode::exportCompleted, this, &MainWindow::onExportCompleted);
@@ -916,7 +1000,9 @@ void MainWindow::doReadExcel()
     connector->configure(params);
 
     // === ÉTAPE 3 : Créer le SourceNode ===
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "Excel Source");
+    const QString nodeName = params.value("nodeName", "Excel Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("Excel Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -937,7 +1023,7 @@ void MainWindow::doReadExcel()
 
 void MainWindow::doReadFEC()
 {
-    QMap<QString, QVariant> params = CustomFECDialog::getFECReadParameters(this);
+    QMap<QString, QVariant> params = CustomFECDialog::getFECReadParameters(this, "FEC Source");
 
     if (params.isEmpty()) {
         m_isProcessing = false;
@@ -949,7 +1035,9 @@ void MainWindow::doReadFEC()
     auto connector = std::make_unique<FECConnector>(this);
     connector->configure(params);
 
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "FEC Source");
+    const QString nodeName = params.value("nodeName", "FEC Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("FEC Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -970,7 +1058,7 @@ void MainWindow::doReadFEC()
 
 void MainWindow::doReadSQL()
 {
-    QMap<QString, QVariant> params = CustomSQLDialog::getSQLReadParameters(this);
+    QMap<QString, QVariant> params = CustomSQLDialog::getSQLReadParameters(this, "SQL Source");
 
     if (params.isEmpty()) {
         m_isProcessing = false;
@@ -982,7 +1070,9 @@ void MainWindow::doReadSQL()
     auto connector = std::make_unique<SQLConnector>(this);
     connector->configure(params);
 
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "SQL Source");
+    const QString nodeName = params.value("nodeName", "SQL Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("SQL Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -1003,7 +1093,7 @@ void MainWindow::doReadSQL()
 
 void MainWindow::doReadJSON()
 {
-    QMap<QString, QVariant> params = CustomJSONDialog::getJSONReadParameters(this);
+    QMap<QString, QVariant> params = CustomJSONDialog::getJSONReadParameters(this, "JSON Source");
 
     if (params.isEmpty()) {
         m_isProcessing = false;
@@ -1015,7 +1105,9 @@ void MainWindow::doReadJSON()
     auto connector = std::make_unique<JSONConnector>(this);
     connector->configure(params);
 
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "JSON Source");
+    const QString nodeName = params.value("nodeName", "JSON Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("JSON Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -1048,7 +1140,9 @@ void MainWindow::doReadXML()
     auto connector = std::make_unique<XMLConnector>(this);
     connector->configure(params);
 
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "XML Source");
+    const QString nodeName = params.value("nodeName", "XML Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("XML Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -1094,7 +1188,9 @@ void MainWindow::doWriteXML(){
     auto connector = std::make_unique<XMLConnector>(this);
     connector->configure(params);
 
-    auto* targetNode = m_network.createTargetNode(std::move(connector), m_selectedNode, "XML Target");
+    const QString nodeName = params.value("nodeName", "XML Target").toString().trimmed();
+    auto* targetNode = m_network.createTargetNode(std::move(connector), m_selectedNode,
+                                                  nodeName.isEmpty() ? QString("XML Target") : nodeName);
 
     connect(targetNode, &RuntimeNode::tableChanged, this, &MainWindow::onNodeTableChanged);
     connect(targetNode, &TargetNode::exportCompleted, this, &MainWindow::onExportCompleted);
@@ -1129,7 +1225,9 @@ void MainWindow::doReadWeb()
     auto connector = std::make_unique<WebConnector>(this);
     connector->configure(params);
 
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "Web Source");
+    const QString nodeName = params.value("nodeName", "Web Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("Web Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -1162,7 +1260,9 @@ void MainWindow::doReadPDF()
     auto connector = std::make_unique<PDFConnector>(this);
     connector->configure(params);
 
-    auto* sourceNode = m_network.createSourceNode(std::move(connector), "PDF Source");
+    const QString nodeName = params.value("nodeName", "PDF Source").toString().trimmed();
+    auto* sourceNode = m_network.createSourceNode(std::move(connector),
+                                                  nodeName.isEmpty() ? QString("PDF Source") : nodeName);
 
     connect(sourceNode, &RuntimeNode::tableChanged,
             this, &MainWindow::onNodeTableChanged);
@@ -1189,9 +1289,9 @@ void MainWindow::doAddFilter()
     const DataTable& table = m_selectedNode->getCachedResult();
 
     // Utiliser le dialogue avec le DataTable complet
-    QString column, opStr, value;
+    QString column, opStr, value, nodeName;
 
-    if (!CustomFilterDialog::getFilterParameters(this, &table, column, opStr, value)) {
+    if (!CustomFilterDialog::getFilterParameters(this, &table, column, opStr, value, &nodeName)) {
         m_isProcessing = false;
         setUiEnabled(true);
         processNextOperation();
@@ -1204,7 +1304,8 @@ void MainWindow::doAddFilter()
     // Créer le filtre avec l'enum
     auto* filter = new FilterTransformation(column, op, value, this);
     RuntimeNode* parentNode = m_selectedNode; // Save parent before onNodeAdded modifies m_selectedNode
-    auto* filterNode = m_network.createTransformationNode(filter, m_selectedNode, filter->description());
+    const QString safeNodeName = nodeName.trimmed().isEmpty() ? filter->description() : nodeName.trimmed();
+    auto* filterNode = m_network.createTransformationNode(filter, m_selectedNode, safeNodeName);
 
     connect(filterNode, &RuntimeNode::tableChanged,this, &MainWindow::onNodeTableChanged);
 
@@ -1229,8 +1330,9 @@ void MainWindow::doSelectColumns()
 
     // Utiliser le nouveau dialogue
     QStringList columns;
+    QString nodeName;
 
-    if (!CustomSelectColumnsDialog::getSelectedColumns(this, &table, columns)) {
+    if (!CustomSelectColumnsDialog::getSelectedColumns(this, &table, columns, &nodeName)) {
         // L'utilisateur a annulé
         m_isProcessing = false;
         setUiEnabled(true);
@@ -1251,7 +1353,8 @@ void MainWindow::doSelectColumns()
     // Créer et ajouter la transformation
     auto* trans = new SelectColumnsTransformation(columns, this);
     RuntimeNode* parentNode = m_selectedNode; // Save parent before onNodeAdded modifies m_selectedNode
-    auto* selectNode = m_network.createTransformationNode(trans,m_selectedNode, trans->description());
+    const QString safeNodeName = nodeName.trimmed().isEmpty() ? trans->description() : nodeName.trimmed();
+    auto* selectNode = m_network.createTransformationNode(trans,m_selectedNode, safeNodeName);
 
     connect(selectNode, &RuntimeNode::tableChanged,this, &MainWindow::onNodeTableChanged);
 

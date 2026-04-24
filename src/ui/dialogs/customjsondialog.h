@@ -32,16 +32,20 @@ namespace dn::dialogs {
         Q_OBJECT
 
     public:
-        explicit CustomJSONDialog(ConnectorMode mode = ConnectorMode::Read, QWidget *parent = nullptr);
+        explicit CustomJSONDialog(ConnectorMode mode = ConnectorMode::Read,
+                                  const QString& defaultNodeName = QString(),
+                                  QWidget *parent = nullptr);
 
         /// Retourne les paramètres configurés
         QMap<QString, QVariant> getParameters() const;
 
         /// Affiche le dialogue en mode lecture
-        static QMap<QString, QVariant> getJSONReadParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getJSONReadParameters(QWidget *parent = nullptr,
+                                                             const QString& defaultNodeName = "JSON Source");
 
         /// Affiche le dialogue en mode écriture
-        static QMap<QString, QVariant> getJSONWriteParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getJSONWriteParameters(QWidget *parent = nullptr,
+                                                              const QString& defaultNodeName = "JSON Target");
 
         /// Retourne le mode
         ConnectorMode getMode() const { return m_mode; }
@@ -59,6 +63,9 @@ namespace dn::dialogs {
         //══════════════════════════════════════════════════════════════════
         // Widgets
         //══════════════════════════════════════════════════════════════════
+        QLabel *m_nameLabel;
+        QLabel *m_fileLabel;
+        QLineEdit *m_nameEdit;
         QLineEdit *m_fileEdit;
         QCheckBox *m_prettyPrintCheck;
         QPushButton *m_okButton;
@@ -69,6 +76,7 @@ namespace dn::dialogs {
         //══════════════════════════════════════════════════════════════════
         QMap<QString, QVariant> m_params;
         ConnectorMode m_mode;
+        QString m_defaultNodeName;
         bool m_accepted;
     };
 

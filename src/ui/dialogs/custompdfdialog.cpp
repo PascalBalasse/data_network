@@ -9,9 +9,10 @@
 
 using namespace dn::dialogs;
 
-CustomPDFDialog::CustomPDFDialog(ConnectorMode mode, QWidget *parent)
+CustomPDFDialog::CustomPDFDialog(ConnectorMode mode, const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
     , m_mode(mode)
+    , m_defaultNodeName(defaultNodeName)
     , m_accepted(false)
 {
     setupUI();
@@ -30,8 +31,16 @@ void CustomPDFDialog::setupUI()
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
-    QLabel *fileLabel = new QLabel(this);
-    mainLayout->addWidget(fileLabel);
+    m_nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(m_nameLabel);
+
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
+
+    m_fileLabel = new QLabel(this);
+    mainLayout->addWidget(m_fileLabel);
 
     QHBoxLayout *fileLayout = new QHBoxLayout();
     m_fileEdit = new QLineEdit(this);
@@ -89,9 +98,8 @@ void CustomPDFDialog::setupUI()
 
 void CustomPDFDialog::updateUIForMode()
 {
-    QLabel *fileLabel = findChild<QLabel*>();
-    if (fileLabel) {
-        fileLabel->setText("<b>Fichier PDF à charger :</b>");
+    if (m_fileLabel) {
+        m_fileLabel->setText("<b>Fichier PDF à charger :</b>");
     }
 }
 
@@ -134,6 +142,7 @@ void CustomPDFDialog::validateAndAccept()
     }
 
     m_params.clear();
+    m_params["nodeName"] = m_nameEdit->text().trimmed();
     m_params["fileName"] = m_fileEdit->text();
     m_params["hasHeader"] = m_headerCheck->isChecked();
     m_params["startPage"] = m_startPageCombo->currentData().toInt();
@@ -149,9 +158,9 @@ QMap<QString, QVariant> CustomPDFDialog::getParameters() const
     return m_params;
 }
 
-QMap<QString, QVariant> CustomPDFDialog::getPDFReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomPDFDialog::getPDFReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomPDFDialog dialog(ConnectorMode::Read, parent);
+    CustomPDFDialog dialog(ConnectorMode::Read, defaultNodeName, parent);
 
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();

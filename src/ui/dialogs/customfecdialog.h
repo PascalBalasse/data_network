@@ -17,19 +17,23 @@ namespace dn::dialogs{
         Q_OBJECT
 
     public:
-        explicit CustomFECDialog(QWidget *parent = nullptr);
+        explicit CustomFECDialog(const QString& defaultNodeName = QString(),
+                                 QWidget *parent = nullptr);
 
         QMap<QString, QVariant> getParameters() const;
 
-        static QMap<QString, QVariant> getFECReadParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getFECReadParameters(QWidget *parent = nullptr,
+                                                            const QString& defaultNodeName = "FEC Source");
 
     private slots:
         void onBrowseClicked();
 
     private:
+        QLineEdit *m_nameEdit;
         QLineEdit *m_fileEdit;
         QPushButton *m_okButton;
         QMap<QString, QVariant> m_params;
+        QString m_defaultNodeName;
     };
 
 }

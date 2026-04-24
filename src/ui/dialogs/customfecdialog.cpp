@@ -8,13 +8,22 @@
 
 using namespace dn::dialogs;
 
-CustomFECDialog::CustomFECDialog(QWidget *parent)
+CustomFECDialog::CustomFECDialog(const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
+    , m_defaultNodeName(defaultNodeName)
 {
     setWindowTitle("Chargement d'un fichier FEC");
     setMinimumWidth(500);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
+
+    QLabel *nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(nameLabel);
+
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
 
     QLabel *infoLabel = new QLabel(
         "<b>Fichier des Écritures Comptables (FEC)</b><br>"
@@ -81,12 +90,13 @@ QMap<QString, QVariant> CustomFECDialog::getParameters() const
     return m_params;
 }
 
-QMap<QString, QVariant> CustomFECDialog::getFECReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomFECDialog::getFECReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomFECDialog dialog(parent);
+    CustomFECDialog dialog(defaultNodeName, parent);
 
     if (dialog.exec() == QDialog::Accepted) {
         QMap<QString, QVariant> params;
+        params["nodeName"] = dialog.m_nameEdit->text().trimmed();
         params["fileName"] = dialog.m_fileEdit->text();
         params["hasHeader"] = true;
         return params;

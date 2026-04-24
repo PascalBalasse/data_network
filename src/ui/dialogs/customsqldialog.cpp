@@ -12,13 +12,21 @@
 
 using namespace dn::dialogs;
 
-CustomSQLDialog::CustomSQLDialog(QWidget *parent)
+CustomSQLDialog::CustomSQLDialog(const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
+    , m_defaultNodeName(defaultNodeName)
 {
     setWindowTitle("Connexion à une base de données SQL");
     setMinimumWidth(500);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
+
+    QLabel *nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(nameLabel);
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
 
     QLabel *infoLabel = new QLabel(
         "<b>Connexion à une base de données SQL</b><br>"
@@ -192,6 +200,7 @@ QMap<QString, QVariant> CustomSQLDialog::getParameters() const
 {
     QMap<QString, QVariant> params;
     params["databaseType"] = m_dbTypeCombo->itemData(m_dbTypeCombo->currentIndex());
+    params["nodeName"] = m_nameEdit->text().trimmed();
     params["databaseName"] = m_databaseEdit->text();
     params["tableName"] = m_tableNameEdit->text();
     params["sqlQuery"] = m_sqlQueryEdit->text();
@@ -202,9 +211,9 @@ QMap<QString, QVariant> CustomSQLDialog::getParameters() const
     return params;
 }
 
-QMap<QString, QVariant> CustomSQLDialog::getSQLReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomSQLDialog::getSQLReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomSQLDialog dialog(parent);
+    CustomSQLDialog dialog(defaultNodeName, parent);
 
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();

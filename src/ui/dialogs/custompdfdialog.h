@@ -34,13 +34,16 @@ namespace dn::dialogs {
         Q_OBJECT
 
     public:
-        explicit CustomPDFDialog(ConnectorMode mode = ConnectorMode::Read, QWidget *parent = nullptr);
+        explicit CustomPDFDialog(ConnectorMode mode = ConnectorMode::Read,
+                                 const QString& defaultNodeName = QString(),
+                                 QWidget *parent = nullptr);
 
         /// Retourne les paramètres
         QMap<QString, QVariant> getParameters() const;
 
         /// Affiche le dialogue en mode lecture
-        static QMap<QString, QVariant> getPDFReadParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getPDFReadParameters(QWidget *parent = nullptr,
+                                                            const QString& defaultNodeName = "PDF Source");
 
         /// Retourne le mode
         ConnectorMode getMode() const { return m_mode; }
@@ -58,6 +61,9 @@ namespace dn::dialogs {
         //══════════════════════════════════════════════════════════════════
         // Widgets
         //══════════════════════════════════════════════════════════════════
+        QLabel *m_nameLabel;
+        QLabel *m_fileLabel;
+        QLineEdit *m_nameEdit;
         QLineEdit *m_fileEdit;
         QComboBox *m_startPageCombo;
         QComboBox *m_endPageCombo;
@@ -70,6 +76,7 @@ namespace dn::dialogs {
         //══════════════════════════════════════════════════════════════════
         QMap<QString, QVariant> m_params;
         ConnectorMode m_mode;
+        QString m_defaultNodeName;
         bool m_accepted;
     };
 

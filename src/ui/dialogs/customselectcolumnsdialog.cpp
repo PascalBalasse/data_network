@@ -51,6 +51,12 @@ void CustomSelectColumnsDialog::setupUI()
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
+    QLabel *nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(nameLabel);
+    m_nameEdit = new QLineEdit("Select Columns", this);
+    m_nameEdit->setMaxLength(20);
+    mainLayout->addWidget(m_nameEdit);
+
     QLabel *instructionLabel = new QLabel(
         "<b>Sélectionnez les colonnes à conserver :</b><br>"
         "Cochez les colonnes que vous souhaitez garder dans le résultat.", this);
@@ -253,7 +259,8 @@ void CustomSelectColumnsDialog::onReject()
 // Méthode statique
 bool CustomSelectColumnsDialog::getSelectedColumns(QWidget *parent,
                                                    const dn::core::DataTable* table,
-                                                   QStringList& columns)
+                                                   QStringList& columns,
+                                                   QString* nodeName)
 {
     if (!table || table->rowCount() == 0) {
         QMessageBox::warning(parent, "Erreur",
@@ -265,6 +272,9 @@ bool CustomSelectColumnsDialog::getSelectedColumns(QWidget *parent,
 
     if (dialog.exec() == QDialog::Accepted) {
         columns = dialog.getSelectedColumns();
+        if (nodeName) {
+            *nodeName = dialog.m_nameEdit->text().trimmed();
+        }
         return true;
     }
 

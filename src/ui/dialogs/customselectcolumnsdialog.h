@@ -44,7 +44,8 @@ namespace dn::dialogs{
         /// Méthode statique simplifiée
         static bool getSelectedColumns(QWidget *parent,
                                        const dn::core::DataTable* table,
-                                       QStringList& columns);
+                                       QStringList& columns,
+                                       QString* nodeName = nullptr);
 
     private slots:
         void onAccept();
@@ -64,6 +65,7 @@ namespace dn::dialogs{
         // Widgets
         //══════════════════════════════════════════════════════════════════
         QLineEdit *m_searchEdit;
+        QLineEdit *m_nameEdit;
         QListWidget *m_columnList;
         QTableView *m_previewTable;
         dn::ui::DataTableModel *m_previewModel;

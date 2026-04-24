@@ -57,7 +57,8 @@ namespace dn::dialogs{
                                         const dn::core::DataTable* table,
                                         QString& column,
                                         QString& op,
-                                        QString& value);
+                                        QString& value,
+                                        QString* nodeName = nullptr);
 
     private slots:
         void onColumnChanged(int index);
@@ -80,6 +81,7 @@ namespace dn::dialogs{
         //══════════════════════════════════════════════════════════════════
         QComboBox *m_columnCombo;
         QComboBox *m_operatorCombo;
+        QLineEdit *m_nameEdit;
         QLineEdit *m_valueEdit;
         QListView *m_suggestionsView;
         QLabel *m_previewLabel;
@@ -95,6 +97,7 @@ namespace dn::dialogs{
         QString m_column;
         QString m_operator;
         QString m_value;
+        QString m_nodeName;
         bool m_isValid;
         int m_matchingRows;
 

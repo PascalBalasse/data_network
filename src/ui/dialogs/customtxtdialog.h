@@ -35,16 +35,20 @@ namespace dn::dialogs {
         Q_OBJECT
 
     public:
-        explicit CustomTXTDialog(ConnectorMode mode = ConnectorMode::Read, QWidget *parent = nullptr);
+        explicit CustomTXTDialog(ConnectorMode mode = ConnectorMode::Read,
+                                 const QString& defaultNodeName = QString(),
+                                 QWidget *parent = nullptr);
 
         /// Retourne les paramètres configurés
         QMap<QString, QVariant> getParameters() const;
 
         /// Affiche le dialogue en mode lecture
-        static QMap<QString, QVariant> getTXTReadParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getTXTReadParameters(QWidget *parent = nullptr,
+                                                            const QString& defaultNodeName = "TXT Source");
 
         /// Affiche le dialogue en mode écriture
-        static QMap<QString, QVariant> getTXTWriteParameters(QWidget *parent = nullptr);
+        static QMap<QString, QVariant> getTXTWriteParameters(QWidget *parent = nullptr,
+                                                             const QString& defaultNodeName = "TXT Target");
 
         /// Retourne le mode
         ConnectorMode getMode() const { return m_mode; }
@@ -62,6 +66,9 @@ namespace dn::dialogs {
         //══════════════════════════════════════════════════════════════════
         // Widgets
         //══════════════════════════════════════════════════════════════════
+        QLabel *m_nameLabel;
+        QLabel *m_fileLabel;
+        QLineEdit *m_nameEdit;
         QLineEdit *m_fileEdit;
         QCheckBox *m_headerCheck;
         QComboBox *m_sepCombo;
@@ -73,6 +80,7 @@ namespace dn::dialogs {
         //══════════════════════════════════════════════════════════════════
         QMap<QString, QVariant> m_params;
         ConnectorMode m_mode;
+        QString m_defaultNodeName;
         bool m_accepted;
     };
 

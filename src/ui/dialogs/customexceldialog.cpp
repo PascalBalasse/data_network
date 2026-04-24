@@ -15,9 +15,10 @@
 
 using namespace dn::dialogs;
 
-CustomExcelDialog::CustomExcelDialog(ConnectorMode mode, QWidget *parent)
+CustomExcelDialog::CustomExcelDialog(ConnectorMode mode, const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
     , m_mode(mode)
+    , m_defaultNodeName(defaultNodeName)
     , m_accepted(false)
     , m_previewTable(nullptr)
     , m_previewModel(nullptr)
@@ -39,9 +40,17 @@ void CustomExcelDialog::setupUI()
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
+    m_nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(m_nameLabel);
+
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
+
     // === File selection ===
-    QLabel *fileLabel = new QLabel(this);
-    mainLayout->addWidget(fileLabel);
+    m_fileLabel = new QLabel(this);
+    mainLayout->addWidget(m_fileLabel);
 
     QHBoxLayout *fileLayout = new QHBoxLayout();
     m_fileEdit = new QLineEdit(this);
@@ -130,12 +139,11 @@ void CustomExcelDialog::setupUI()
 
 void CustomExcelDialog::updateUIForMode()
 {
-    QLabel *fileLabel = findChild<QLabel*>();
-    if (fileLabel) {
+    if (m_fileLabel) {
         if (m_mode == ConnectorMode::Read) {
-            fileLabel->setText("<b>Fichier Excel à charger :</b>");
+            m_fileLabel->setText("<b>Fichier Excel à charger :</b>");
         } else {
-            fileLabel->setText("<b>Fichier Excel de destination :</b>");
+            m_fileLabel->setText("<b>Fichier Excel de destination :</b>");
         }
     }
 }
@@ -282,6 +290,7 @@ void CustomExcelDialog::validateAndAccept()
 
     // Store parameters
     m_params.clear();
+    m_params["nodeName"] = m_nameEdit->text().trimmed();
     m_params["fileName"] = m_fileEdit->text();
     m_params["hasHeader"] = m_headerCheck->isChecked();
 
@@ -302,9 +311,9 @@ QMap<QString, QVariant> CustomExcelDialog::getParameters() const
     return m_params;
 }
 
-QMap<QString, QVariant> CustomExcelDialog::getExcelReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomExcelDialog::getExcelReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomExcelDialog dialog(ConnectorMode::Read, parent);
+    CustomExcelDialog dialog(ConnectorMode::Read, defaultNodeName, parent);
 
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();
@@ -313,9 +322,9 @@ QMap<QString, QVariant> CustomExcelDialog::getExcelReadParameters(QWidget *paren
     return QMap<QString, QVariant>();
 }
 
-QMap<QString, QVariant> CustomExcelDialog::getExcelWriteParameters(QWidget *parent)
+QMap<QString, QVariant> CustomExcelDialog::getExcelWriteParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomExcelDialog dialog(ConnectorMode::Write, parent);
+    CustomExcelDialog dialog(ConnectorMode::Write, defaultNodeName, parent);
 
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();

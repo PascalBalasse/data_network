@@ -55,6 +55,11 @@ void CustomFilterDialog::setupUI()
     QGroupBox *filterGroup = new QGroupBox("Configuration du filtre", this);
     QFormLayout *formLayout = new QFormLayout(filterGroup);
 
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText("Filter");
+    formLayout->addRow("Nom du nœud:", m_nameEdit);
+
     // Sélection de la colonne
     m_columnCombo = new QComboBox(this);
     if (m_table) {
@@ -444,7 +449,8 @@ bool CustomFilterDialog::getFilterParameters(QWidget *parent,
                                              const dn::core::DataTable* table,
                                              QString& column,
                                              QString& op,
-                                             QString& value)
+                                             QString& value,
+                                             QString* nodeName)
 {
     if (!table || table->rowCount() == 0) {
         QMessageBox::warning(parent, "Erreur",
@@ -458,6 +464,9 @@ bool CustomFilterDialog::getFilterParameters(QWidget *parent,
         column = dialog.getColumn();
         op = dialog.getOperator();
         value = dialog.getValue();
+        if (nodeName) {
+            *nodeName = dialog.m_nameEdit->text().trimmed();
+        }
         return true;
     }
 

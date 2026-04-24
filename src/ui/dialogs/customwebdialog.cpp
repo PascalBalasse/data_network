@@ -14,8 +14,9 @@
 
 using namespace dn::dialogs;
 
-CustomWebDialog::CustomWebDialog(QWidget *parent)
+CustomWebDialog::CustomWebDialog(const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
+    , m_defaultNodeName(defaultNodeName)
     , m_accepted(false)
 {
     setupUI();
@@ -28,6 +29,14 @@ void CustomWebDialog::setupUI()
     setMinimumHeight(200);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
+
+    QLabel *nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(nameLabel);
+
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
 
     QLabel *urlLabel = new QLabel("URL de la page web:", this);
     mainLayout->addWidget(urlLabel);
@@ -74,6 +83,7 @@ void CustomWebDialog::onAccept()
     }
 
     m_params["url"] = url;
+    m_params["nodeName"] = m_nameEdit->text().trimmed();
     m_params["tableIndex"] = m_tableIndexSpin->value();
     m_accepted = true;
     accept();
@@ -89,9 +99,9 @@ QMap<QString, QVariant> CustomWebDialog::getParameters() const
     return m_params;
 }
 
-QMap<QString, QVariant> CustomWebDialog::getWebReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomWebDialog::getWebReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomWebDialog dialog(parent);
+    CustomWebDialog dialog(defaultNodeName, parent);
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();
     }

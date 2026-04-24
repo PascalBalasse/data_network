@@ -19,9 +19,10 @@
 using namespace dn::dialogs;
 
 /// Constructeur
-CustomTXTDialog::CustomTXTDialog(ConnectorMode mode, QWidget *parent)
+CustomTXTDialog::CustomTXTDialog(ConnectorMode mode, const QString& defaultNodeName, QWidget *parent)
     : QDialog(parent)
     , m_mode(mode)
+    , m_defaultNodeName(defaultNodeName)
     , m_accepted(false)
 {
     setupUI();
@@ -41,9 +42,17 @@ void CustomTXTDialog::setupUI()
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
+    m_nameLabel = new QLabel("<b>Nom du nœud :</b>", this);
+    mainLayout->addWidget(m_nameLabel);
+
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(20);
+    m_nameEdit->setText(m_defaultNodeName.trimmed().left(20));
+    mainLayout->addWidget(m_nameEdit);
+
     // === Sélection du fichier ===
-    QLabel *fileLabel = new QLabel(this);
-    mainLayout->addWidget(fileLabel);
+    m_fileLabel = new QLabel(this);
+    mainLayout->addWidget(m_fileLabel);
 
     QHBoxLayout *fileLayout = new QHBoxLayout();
     m_fileEdit = new QLineEdit(this);
@@ -111,6 +120,14 @@ void CustomTXTDialog::setupUI()
 
 void CustomTXTDialog::updateUIForMode()
 {
+    if (m_fileLabel) {
+        if (m_mode == ConnectorMode::Read) {
+            m_fileLabel->setText("<b>Fichier TXT à charger :</b>");
+        } else {
+            m_fileLabel->setText("<b>Fichier TXT de destination :</b>");
+        }
+    }
+
     if (m_mode == ConnectorMode::Read) {
         setWindowTitle("Chargement d'un fichier TXT");
     } else {
@@ -157,6 +174,7 @@ void CustomTXTDialog::validateAndAccept()
     }
 
     m_params["fileName"] = fileName;
+    m_params["nodeName"] = m_nameEdit->text().trimmed();
     m_params["separator"] = m_sepCombo->currentData();
     m_params["hasHeader"] = m_headerCheck->isChecked();
     m_accepted = true;
@@ -167,18 +185,18 @@ QMap<QString, QVariant> CustomTXTDialog::getParameters() const
     return m_params;
 }
 
-QMap<QString, QVariant> CustomTXTDialog::getTXTReadParameters(QWidget *parent)
+QMap<QString, QVariant> CustomTXTDialog::getTXTReadParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomTXTDialog dialog(ConnectorMode::Read, parent);
+    CustomTXTDialog dialog(ConnectorMode::Read, defaultNodeName, parent);
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();
     }
     return QMap<QString, QVariant>();
 }
 
-QMap<QString, QVariant> CustomTXTDialog::getTXTWriteParameters(QWidget *parent)
+QMap<QString, QVariant> CustomTXTDialog::getTXTWriteParameters(QWidget *parent, const QString& defaultNodeName)
 {
-    CustomTXTDialog dialog(ConnectorMode::Write, parent);
+    CustomTXTDialog dialog(ConnectorMode::Write, defaultNodeName, parent);
     if (dialog.exec() == QDialog::Accepted) {
         return dialog.getParameters();
     }
