@@ -13,6 +13,7 @@
 #include "DataTable.h"
 
 #include <QDate>
+#include <QRegularExpression>
 
 using namespace dn::core;
 
@@ -357,4 +358,205 @@ bool DataTable::isTableValue(const QVariant& value)
 {
     // Vérifie le type utilisateur pour DataTable imbriquée
     return value.userType() == qMetaTypeId<DataTable>();
+}
+
+//════════════════════════════════════════════════════════════════════════════
+// Colonnes calculées
+//═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * @brief Ajoute une colonne calculée basée sur une expression
+ * @param columnName Nom de la nouvelle colonne
+ * @param expression Expression utilisant les références de colonnes comme [NomColonne]
+ * @param type Type de données de la colonne résultante
+ * @return true si succès, false si erreur dans l'expression
+ */
+bool DataTable::addCalculatedColumn(const QString& columnName,
+                                   const QString& expression,
+                                   ColumnType type)
+{
+    // Valider les entrées
+    if (columnName.isEmpty() || expression.isEmpty()) {
+        return false;
+    }
+    
+    // Vérifier que la colonne n'existe pas déjà
+    if (columnIndex(columnName) != -1) {
+        return false; // Colonne avec ce nom existe déjà
+    }
+    
+    // Si pas de lignes, juste ajouter la colonne vide
+    if (rowCount() == 0) {
+        // Ajouter le nom de la colonne
+        QStringList newColumnNames = m_columnNames;
+        newColumnNames.append(columnName);
+        setColumnNames(newColumnNames);
+        
+        // Ajouter le type de colonne
+        QList<ColumnType> newColumnTypes = m_columnTypes;
+        newColumnTypes.append(type);
+        setColumnTypes(newColumnTypes);
+        
+        return true;
+    }
+    
+    // Parser l'expression pour extraire les références de colonnes
+    QSet<int> referencedColumns;
+    QString parsedExpression = expression;
+    QRegularExpression re("\\[([^\\]]+)\\]");  // Match [NomColonne]
+    QRegularExpressionMatchIterator it = re.globalMatch(expression);
+    
+    while (it.hasNext()) {
+        QRegularExpressionMatch match = it.next();
+        QString colName = match.captured(1);
+        int colIdx = columnIndex(colName);
+        if (colIdx == -1) {
+            // Référence à une colonne inexistante
+            return false;
+        }
+        referencedColumns.insert(colIdx);
+        // Remplacer la référence par un marqueur pour l'évaluation
+        parsedExpression.replace(match.capturedStart(), match.capturedLength(), 
+                                QString("COL_%1").arg(colIdx));
+    }
+    
+    // Préparer l'expression pour l'évaluation en remplaçant les marqueurs
+    // Par exemple: "[Col1] + [Col2]" devient "value(COL_0) + value(COL_1)"
+    QString evalExpression = parsedExpression;
+    QRegularExpression colMarkerRe("COL_(\\d+)");
+    QRegularExpressionMatchIterator markerIt = colMarkerRe.globalMatch(parsedExpression);
+    
+    while (markerIt.hasNext()) {
+        QRegularExpressionMatch match = markerIt.next();
+        int colIdx = match.captured(1).toInt();
+        evalExpression.replace(match.capturedStart(), match.capturedLength(),
+                              QString("value(%1)").arg(colIdx));
+    }
+    
+    // Calculer les valeurs pour chaque ligne
+    QList<QVariant> newColumnValues;
+    newColumnValues.reserve(rowCount());
+    
+    for (int row = 0; row < rowCount(); ++row) {
+        // Créer une fonction lambda qui capture la ligne courante
+        auto valueAt = [this, row](int colIndex) -> QVariant {
+            return this->value(row, colIndex);
+        };
+        
+        // Remplacer les appels value() dans l'expression par les valeurs réelles
+        QString rowExpression = evalExpression;
+        QRegularExpression valueRe("value\\((\\d+)\\)");
+        QRegularExpressionMatchIterator valueIt = valueRe.globalMatch(evalExpression);
+        
+        while (valueIt.hasNext()) {
+            QRegularExpressionMatch match = valueIt.next();
+            int colIdx = match.captured(1).toInt();
+            QVariant cellValue = valueAt(colIdx);
+            
+            // Convertir la valeur en représentation appropriée pour l'évaluation
+            QString valueStr;
+            if (cellValue.isNull()) {
+                valueStr = "null";
+            } else {
+                switch (cellValue.type()) {
+                    case QMetaType::Bool:
+                        valueStr = cellValue.toBool() ? "true" : "false";
+                        break;
+                    case QMetaType::Int:
+                        valueStr = QString::number(cellValue.toInt());
+                        break;
+                    case QMetaType::Double:
+                        valueStr = QString::number(cellValue.toDouble());
+                        break;
+                    case QMetaType::QString:
+                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('\"', "\\\""));
+                        break;
+                    case QMetaType::QDate:
+                        valueStr = QString("\"%1\"").arg(cellValue.toDate().toString(Qt::ISODate));
+                        break;
+                    case QMetaType::QDateTime:
+                        valueStr = QString("\"%1\"").arg(cellValue.toDateTime().toString(Qt::ISODate));
+                        break;
+                    default:
+                        // Pour les autres types, convertir en chaîne
+                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('\"', "\\\""));
+                        break;
+                }
+            }
+            
+            rowExpression.replace(match.capturedStart(), match.capturedLength(), valueStr);
+        }
+        
+        // Évaluer l'expression (implémentation simplifiée)
+        // Dans une implémentation réelle, on utiliserait un parseur d'expressions comme QJSEngine
+        // ou une bibliothèque comme muParser
+        QVariant result = this->evaluateExpression(rowExpression);
+        newColumnValues.append(result);
+    }
+    
+    // Ajouter la nouvelle colonne au tableau
+    // D'abord ajouter les noms et types
+    QStringList newColumnNames = m_columnNames;
+    newColumnNames.append(columnName);
+    setColumnNames(newColumnNames);
+    
+    QList<ColumnType> newColumnTypes = m_columnTypes;
+    newColumnTypes.append(type);
+    setColumnTypes(newColumnTypes);
+    
+    // Ensuite ajouter les valeurs à chaque ligne
+    for (int row = 0; row < rowCount(); ++row) {
+        m_data[row].append(newColumnValues[row]);
+    }
+    
+    // Convertir les valeurs vers le type spécifié
+    int newColIdx = columnCount() - 1;
+    convertColumnValues(newColIdx, type);
+    
+    return true;
+}
+
+// Méthode d'évaluation d'expression simplifiée
+// Dans une version production, on utiliserait une bibliothèque d'évaluation d'expressions appropriée
+QVariant DataTable::evaluateExpression(const QString& expression) const
+{
+    // Implémentation très basique pour démonstration
+    // Une vraie implémentation aurait besoin d'un parseur d'expressions complet
+    
+    // Gestion des littéraux nuls
+    if (expression.trimmed() == "null") {
+        return QVariant();
+    }
+    
+    // Gestion des booléens
+    if (expression.trimmed() == "true") {
+        return true;
+    }
+    if (expression.trimmed() == "false") {
+        return false;
+    }
+    
+    // Gestion des nombres entiers
+    bool ok;
+    int intValue = expression.toInt(&ok);
+    if (ok && !expression.contains('.') && !expression.contains('/') && !expression.contains(':')) {
+        return intValue;
+    }
+    
+    // Gestion des nombres décimaux
+    double doubleValue = expression.toDouble(&ok);
+    if (ok) {
+        return doubleValue;
+    }
+    
+    // Gestion des chaînes (enlever les guillemets)
+    if (expression.startsWith('\"') && expression.endsWith('\"') && expression.length() >= 2) {
+        QString strValue = expression.mid(1, expression.length() - 2);
+        strValue.replace("\\\"", "\"");
+        return strValue;
+    }
+    
+    // Si on arrive ici, l'expression n'a pas pu être évaluée
+    // Dans une vraie implémentation, on lancerait une exception ou retournerait un d'erreur
+    return QVariant(); // Retourner une valeur nulle indiquant une erreur
 }

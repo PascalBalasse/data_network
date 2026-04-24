@@ -121,6 +121,8 @@ qt_add_executable(data_network
     src/ui/dialogs/customxmldialog.cpp
     src/ui/dialogs/customwebdialog.h
     src/ui/dialogs/customwebdialog.cpp
+    src/ui/dialogs/customcalculatedcolumndialog.h
+    src/ui/dialogs/customcalculatedcolumndialog.cpp
     src/network/core/enums.h
 )
 

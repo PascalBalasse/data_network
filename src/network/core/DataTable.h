@@ -47,7 +47,7 @@ namespace dn::core {
 
         //══════════════════════════════════════════════════════════════════════
         // Structure du tableau
-        //══════════════════════════════════════════════════════════════════════
+        //═════════════════════════════════════════════════════════════════════
 
         /**
          * @brief Retourne le nombre de lignes (enregistrements) dans le tableau
@@ -61,9 +61,9 @@ namespace dn::core {
          */
         int columnCount() const;
 
-        //══════════════════════════════════════════════════════════════════════
+        //═════════════════════════════════════════════════════════════════════
         // Accès aux données
-        //══════════════════════════════════════════════════════════════════════
+        //════════════════════════════════════════════════════════════════════
 
         /**
          * @brief Récupère la valeur à une position row, col
@@ -105,9 +105,9 @@ namespace dn::core {
          */
         const QList<ColumnType>& columnTypes() const { return m_columnTypes; }
 
-        //══════════════════════════════════════════════════════════════════════
+        //═════════════════════════════════════════════════════════════════════
         // Gestion des types
-        //══════════════════════════════════════════════════════════════════════
+        //═══════════════════════════════════════════════════════════════════
 
         /**
          * @brief Retourne le type détecté d'une colonne
@@ -140,9 +140,9 @@ namespace dn::core {
          */
         void forceColumnType(int colIndex, ColumnType type, bool convertValues = true);
 
-        //══════════════════════════════════════════════════════════════════════
+        //════════════════════════════════════════════════════════════════════
         // Types complexes (List, Pair, Table)
-        //══════════════════════════════════════════════════════════════════════
+        //══════════════════════════════════════════════════════════════════
 
         /**
          * @brief Vérifie si un type est complexe (List, Pair ou Table)
@@ -172,9 +172,31 @@ namespace dn::core {
          */
         static bool isTableValue(const QVariant& value);
 
-        //══════════════════════════════════════════════════════════════════════
+        //═══════════════════════════════════════════════════════════════════
+        // Colonnes calculées
+        //═════════════════════════════════════════════════════════════════
+
+        /**
+         * @brief Ajoute une colonne calculée basée sur une expression
+         * @param columnName Nom de la nouvelle colonne
+         * @param expression Expression utilisant les références de colonnes comme [NomColonne]
+         * @param type Type de données de la colonne résultante
+         * @return true si succès, false si erreur dans l'expression
+         */
+        bool addCalculatedColumn(const QString& columnName,
+                                 const QString& expression,
+                                 ColumnType type);
+
+        /**
+         * @brief Évalue une expression simple (pour les colonnes calculées)
+         * @param expression Expression à évaluer
+         * @return Résultat de l'évaluation
+         */
+        QVariant evaluateExpression(const QString& expression) const;
+
+        //═══════════════════════════════════════════════════════════════════
         // Modification du contenu
-        //══════════════════════════════════════════════════════════════════════
+        //═════════════════════════════════════════════════════════════════
 
         /**
          * @brief Définit les noms de colonnes (et initialise les types à String)
@@ -215,9 +237,9 @@ namespace dn::core {
         /// Types de chaque colonne (correspondance index-to-type)
         QList<ColumnType> m_columnTypes;
 
-        //══════════════════════════════════════════════════════════════════════
+        //═══════════════════════════════════════════════════════════════════
         // Détails d'implémentation privés
-        //══════════════════════════════════════════════════════════════════════
+        //══════════════════════════════════════════════════════════════════
 
         /**
          * @brief Détecte le type d'une colonne en analysant ses valeurs
