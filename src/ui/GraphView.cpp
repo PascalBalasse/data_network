@@ -20,6 +20,7 @@
 #include <QContextMenuEvent>
 #include <QAction>
 #include <QTimer>
+#include <QCoreApplication>
 #include <algorithm>
 
 
@@ -823,11 +824,9 @@ void GraphView::applyPositions()
         currentY += maxHeightPerRow.value(row, MIN_NODE_HEIGHT) + ROW_SPACING;
     }
 
-    // Process from bottom row up (highest row number to 0)
-    // Children are positioned first, then parents are centered under their children
-
-    // First pass: position all nodes at their default positions (sorted by parent)
-    for (int row = nodesByRow.keys().last(); row >= 0; --row) {
+    // ===== PASS 1: Position root (parent) nodes first =====
+    // Start from row 0 (top) so parents are positioned before children
+    for (int row = 0; row <= nodesByRow.keys().last(); ++row) {
         if (!nodesByRow.contains(row)) continue;
         qreal y = rowYPositions[row];
 
@@ -1027,6 +1026,33 @@ void GraphView::applyPositions()
                  << "pos:(" << node.position.x() << "," << node.position.y() << ")";
     }
 
+    // ===== PASS 3: Fix overlaps between all nodes on same row =====
+    for (int row = 0; row <= nodesByRow.keys().last(); ++row) {
+        if (!nodesByRow.contains(row)) continue;
+        if (nodesByRow[row].size() <= 1) continue;
+
+        // Sort by X position
+        QVector<QUuid> sorted = nodesByRow[row];
+        std::sort(sorted.begin(), sorted.end(),
+            [this](const QUuid& a, const QUuid& b) {
+                return m_nodes[a].position.x() < m_nodes[b].position.x();
+            });
+
+        // Fix overlaps
+        qreal currentX = m_nodes[sorted[0]].position.x();
+        for (int i = 0; i < sorted.size(); ++i) {
+            QUuid nid = sorted[i];
+            qreal w = m_nodes[nid].shapeItem->boundingRect().width();
+            if (w <= 0) w = MIN_NODE_WIDTH;
+
+            if (m_nodes[nid].position.x() < currentX) {
+                m_nodes[nid].position.setX(currentX);
+                m_nodes[nid].shapeItem->setPos(m_nodes[nid].position);
+            }
+            currentX = m_nodes[nid].position.x() + w + COLUMN_SPACING;
+        }
+    }
+
     centerOnNodes();
 }
 
@@ -1082,6 +1108,9 @@ void GraphView::centerOnNodes()
         return;
     }
 
+    scene()->update();
+    QCoreApplication::processEvents();
+
     QRectF boundingRect;
     bool hasValidRect = false;
 
@@ -1098,11 +1127,17 @@ void GraphView::centerOnNodes()
     }
 
     if (hasValidRect) {
-        boundingRect.adjust(-50, -50, 50, 50);
-        fitInView(boundingRect, Qt::KeepAspectRatio);
+        // Extend scene rect to cover all nodes + padding
+        scene()->setSceneRect(boundingRect.adjusted(-100, -100, 100, 100));
+
+        // Reset any existing transform before fitting
+        resetTransform();
+        fitInView(boundingRect.adjusted(-50, -50, 50, 50), Qt::KeepAspectRatio);
     } else {
         centerOn(0, 0);
     }
+
+    viewport()->repaint();
 }
 
 QHash<QUuid, QPointF> GraphView::getNodePositions() const
