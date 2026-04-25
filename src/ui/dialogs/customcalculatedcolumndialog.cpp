@@ -68,6 +68,7 @@ namespace dn::dialogs{
         // Type de colonne
         QFormLayout* typeLayout = new QFormLayout();
         m_typeCombo = new QComboBox();
+        m_typeCombo->addItem("Auto (détection)", static_cast<int>(dn::core::ColumnType::Any));
         m_typeCombo->addItem("Texte (String)", static_cast<int>(dn::core::ColumnType::String));
         m_typeCombo->addItem("Nombre entier (Integer)", static_cast<int>(dn::core::ColumnType::Integer));
         m_typeCombo->addItem("Nombre décimal (Double)", static_cast<int>(dn::core::ColumnType::Double));

@@ -194,6 +194,31 @@ namespace dn::core {
          */
         QVariant evaluateExpression(const QString& expression) const;
 
+        /**
+         * @brief Trouve un opérateur hors des parenthèses (de droite à gauche)
+         * @param expr Expression
+         * @param op Opérateur à trouver
+         * @return Position de l'opérateur ou -1
+         */
+        int findOperatorOutsideParens(const QString& expr, QChar op) const;
+
+        /**
+         * @brief Évalue une opération binaire
+         * @param left Operande gauche
+         * @param right Operande droit
+         * @param op Opérateur
+         * @return Résultat de l'opération
+         */
+        QVariant evaluateBinaryOp(const QVariant& left, const QVariant& right, QChar op) const;
+
+        /**
+         * @brief Convertit un QVariant en double
+         * @param value Valeur à convertir
+         * @param ok Indicateur de succès
+         * @return Valeur double
+         */
+        double toDouble(const QVariant& value, bool* ok) const;
+
         //═══════════════════════════════════════════════════════════════════
         // Modification du contenu
         //═════════════════════════════════════════════════════════════════

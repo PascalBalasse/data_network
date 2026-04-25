@@ -70,8 +70,12 @@ void DataTable::setColumnNames(const QStringList &names)
 
 void DataTable::setColumnTypes(const QList<ColumnType> &types)
 {
+    if (types.size() != m_columnNames.size()) {
+        qWarning() << "setColumnTypes: size mismatch" << types.size() << "!=" << m_columnNames.size();
+        qWarning() << "  Column names:" << m_columnNames;
+        return;
+    }
     m_columnTypes = types;
-    // Note: ne convertit pas les valeurs existantes
 }
 
 void DataTable::addRow(const QList<QVariant> &row)
@@ -204,11 +208,9 @@ QVariant DataTable::convertToType(const QVariant& value, ColumnType targetType) 
 
 ColumnType DataTable::detectColumnType(int colIndex) const
 {
-    // Index invalide -> String par défaut
     if (colIndex < 0 || colIndex >= columnCount())
         return ColumnType::String;
 
-    // Drapeaux pour chaque type (si tous les valeurs correspondent)
     bool allIntegers = true;
     bool allDoubles = true;
     bool allBooleans = true;
@@ -216,90 +218,74 @@ ColumnType DataTable::detectColumnType(int colIndex) const
     bool allDateTimes = true;
     int nonEmptyCount = 0;
 
-    // Parcourt toutes les lignes pour tester chaque type
     for (int row = 0; row < rowCount(); ++row) {
         QVariant value = this->value(row, colIndex);
         QString strValue = value.toString().trimmed();
 
-        if (strValue.isEmpty()) {
-            continue;  // Ignore les valeurs vides pour la détection
-        }
+        if (strValue.isEmpty())
+            continue;
 
         nonEmptyCount++;
 
-        // Vérifier DateTime (le plus restrictif, testé en premier)
         if (allDateTimes) {
             QDateTime dt = QDateTime::fromString(strValue, Qt::ISODate);
-            if (!dt.isValid()) {
+            if (!dt.isValid())
                 dt = QDateTime::fromString(strValue, "dd/MM/yyyy hh:mm:ss");
-            }
-            if (!dt.isValid()) {
+            if (!dt.isValid())
                 allDateTimes = false;
-            }
         }
 
-        // Vérifier Date (seulement si ce n'est pas un DateTime)
         if (allDates && !allDateTimes) {
             QDate d = QDate::fromString(strValue, Qt::ISODate);
-            if (!d.isValid()) {
+            if (!d.isValid())
                 d = QDate::fromString(strValue, "dd/MM/yyyy");
-            }
-            if (!d.isValid()) {
+            if (!d.isValid())
                 allDates = false;
-            }
         }
 
-        // Vérifier Boolean (si pas date)
         if (allBooleans && !allDates && !allDateTimes) {
             QString lower = strValue.toLower();
             if (lower != "true" && lower != "false" &&
                 lower != "yes" && lower != "no" &&
-                lower != "1" && lower != "0") {
+                lower != "1" && lower != "0")
                 allBooleans = false;
-            }
         }
 
-        // Vérifier Integer (si pas date, bool)
         if (allIntegers && !allDates && !allDateTimes && !allBooleans) {
-            bool isInt;
-            int intVal = strValue.toInt(&isInt);
-            // Vérifie strict: "123" OK, "123.0" NON
-            if (!isInt || QString::number(intVal) != strValue) {
+            bool ok;
+            int intVal = strValue.toInt(&ok);
+            if (!ok) {
                 allIntegers = false;
+            } else {
+                QString roundTrip = QString::number(intVal);
+                if (roundTrip != strValue)
+                    allIntegers = false;
             }
         }
 
-        // Vérifier Double (si pas integer)
         if (allDoubles && !allIntegers && !allDates && !allDateTimes) {
-            bool isDouble;
-            double doubleVal = strValue.toDouble(&isDouble);
-            if (!isDouble || QString::number(doubleVal, 'f', 10).startsWith(strValue)) {
+            bool ok;
+            strValue.toDouble(&ok);
+            if (!ok)
                 allDoubles = false;
-            }
         }
     }
 
-    // Colonne vide -> String par défaut
-    if (nonEmptyCount == 0) {
+    if (nonEmptyCount == 0)
         return ColumnType::String;
-    }
 
-    // Retourne le type le plus spécifique trouvé (hiérarchie: Int < Double < String)
-    if (allIntegers) return ColumnType::Integer;
-    if (allDoubles) return ColumnType::Double;
-    if (allBooleans) return ColumnType::Boolean;
     if (allDateTimes) return ColumnType::DateTime;
     if (allDates) return ColumnType::Date;
-
+    if (allBooleans) return ColumnType::Boolean;
+    if (allIntegers) return ColumnType::Integer;
+    if (allDoubles) return ColumnType::Double;
     return ColumnType::String;
 }
 
 void DataTable::autoDetectAndConvertTypes()
 {
-    // Détecte et convertit chaque colonne independamment
     for (int col = 0; col < columnCount(); ++col) {
         ColumnType detectedType = detectColumnType(col);
-
         if (detectedType != ColumnType::String) {
             setColumnType(col, detectedType);
             convertColumnValues(col, detectedType);
@@ -387,50 +373,49 @@ bool DataTable::addCalculatedColumn(const QString& columnName,
     
     // Si pas de lignes, juste ajouter la colonne vide
     if (rowCount() == 0) {
-        // Ajouter le nom de la colonne
-        QStringList newColumnNames = m_columnNames;
-        newColumnNames.append(columnName);
-        setColumnNames(newColumnNames);
-        
-        // Ajouter le type de colonne
-        QList<ColumnType> newColumnTypes = m_columnTypes;
-        newColumnTypes.append(type);
-        setColumnTypes(newColumnTypes);
-        
+        m_columnNames.append(columnName);
+        m_columnTypes.append(type);
         return true;
     }
     
     // Parser l'expression pour extraire les références de colonnes
     QSet<int> referencedColumns;
     QString parsedExpression = expression;
-    QRegularExpression re("\\[([^\\]]+)\\]");  // Match [NomColonne]
-    QRegularExpressionMatchIterator it = re.globalMatch(expression);
     
-    while (it.hasNext()) {
-        QRegularExpressionMatch match = it.next();
-        QString colName = match.captured(1);
+    int searchPos = 0;
+    while (true) {
+        int bracketStart = parsedExpression.indexOf('[', searchPos);
+        if (bracketStart == -1) break;
+        int bracketEnd = parsedExpression.indexOf(']', bracketStart);
+        if (bracketEnd == -1) break;
+        
+        QString colName = parsedExpression.mid(bracketStart + 1, bracketEnd - bracketStart - 1);
         int colIdx = columnIndex(colName);
         if (colIdx == -1) {
-            // Référence à une colonne inexistante
             return false;
         }
         referencedColumns.insert(colIdx);
-        // Remplacer la référence par un marqueur pour l'évaluation
-        parsedExpression.replace(match.capturedStart(), match.capturedLength(), 
+        parsedExpression.replace(bracketStart, bracketEnd - bracketStart + 1, 
                                 QString("COL_%1").arg(colIdx));
+        searchPos = bracketStart;
     }
     
-    // Préparer l'expression pour l'évaluation en remplaçant les marqueurs
-    // Par exemple: "[Col1] + [Col2]" devient "value(COL_0) + value(COL_1)"
+// Préparer l'expression pour l'évaluation en remplaçant les marqueurs
+    // Par exemple: "[Col1] + [Col2]" devient "value(0) + value(1)"
     QString evalExpression = parsedExpression;
-    QRegularExpression colMarkerRe("COL_(\\d+)");
-    QRegularExpressionMatchIterator markerIt = colMarkerRe.globalMatch(parsedExpression);
     
+    QList<QPair<int, int>> markerPositions;
+    QRegularExpression colMarkerRe("COL_(\\d+)");
+    QRegularExpressionMatchIterator markerIt = colMarkerRe.globalMatch(evalExpression);
     while (markerIt.hasNext()) {
-        QRegularExpressionMatch match = markerIt.next();
-        int colIdx = match.captured(1).toInt();
-        evalExpression.replace(match.capturedStart(), match.capturedLength(),
-                              QString("value(%1)").arg(colIdx));
+        QRegularExpressionMatch m = markerIt.next();
+        markerPositions.append(qMakePair(m.capturedStart(), m.captured(1).toInt()));
+    }
+    
+    for (int i = markerPositions.size() - 1; i >= 0; --i) {
+        int pos = markerPositions[i].first;
+        int colIdx = markerPositions[i].second;
+        evalExpression.replace(pos, 5, QString("value(%1)").arg(colIdx));
     }
     
     // Calculer les valeurs pour chaque ligne
@@ -438,27 +423,25 @@ bool DataTable::addCalculatedColumn(const QString& columnName,
     newColumnValues.reserve(rowCount());
     
     for (int row = 0; row < rowCount(); ++row) {
-        // Créer une fonction lambda qui capture la ligne courante
         auto valueAt = [this, row](int colIndex) -> QVariant {
             return this->value(row, colIndex);
         };
         
-        // Remplacer les appels value() dans l'expression par les valeurs réelles
         QString rowExpression = evalExpression;
         QRegularExpression valueRe("value\\((\\d+)\\)");
-        QRegularExpressionMatchIterator valueIt = valueRe.globalMatch(evalExpression);
+        QRegularExpressionMatchIterator valueIt = valueRe.globalMatch(rowExpression);
         
+        QList<QPair<int, QString>> replacements;
         while (valueIt.hasNext()) {
             QRegularExpressionMatch match = valueIt.next();
             int colIdx = match.captured(1).toInt();
             QVariant cellValue = valueAt(colIdx);
             
-            // Convertir la valeur en représentation appropriée pour l'évaluation
             QString valueStr;
             if (cellValue.isNull()) {
                 valueStr = "null";
             } else {
-                switch (cellValue.type()) {
+                switch (cellValue.typeId()) {
                     case QMetaType::Bool:
                         valueStr = cellValue.toBool() ? "true" : "false";
                         break;
@@ -469,7 +452,7 @@ bool DataTable::addCalculatedColumn(const QString& columnName,
                         valueStr = QString::number(cellValue.toDouble());
                         break;
                     case QMetaType::QString:
-                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('\"', "\\\""));
+                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('"', "\\\""));
                         break;
                     case QMetaType::QDate:
                         valueStr = QString("\"%1\"").arg(cellValue.toDate().toString(Qt::ISODate));
@@ -478,85 +461,219 @@ bool DataTable::addCalculatedColumn(const QString& columnName,
                         valueStr = QString("\"%1\"").arg(cellValue.toDateTime().toString(Qt::ISODate));
                         break;
                     default:
-                        // Pour les autres types, convertir en chaîne
-                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('\"', "\\\""));
+                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('"', "\\\""));
                         break;
                 }
             }
             
-            rowExpression.replace(match.capturedStart(), match.capturedLength(), valueStr);
+            replacements.append(qMakePair(match.capturedStart(), valueStr));
         }
         
-        // Évaluer l'expression (implémentation simplifiée)
-        // Dans une implémentation réelle, on utiliserait un parseur d'expressions comme QJSEngine
-        // ou une bibliothèque comme muParser
+        for (int i = replacements.size() - 1; i >= 0; --i) {
+            int pos = replacements[i].first;
+            rowExpression.replace(pos, 8, replacements[i].second);
+        }
+        
+        // Évaluer l'expression
         QVariant result = this->evaluateExpression(rowExpression);
         newColumnValues.append(result);
     }
     
     // Ajouter la nouvelle colonne au tableau
-    // D'abord ajouter les noms et types
-    QStringList newColumnNames = m_columnNames;
-    newColumnNames.append(columnName);
-    setColumnNames(newColumnNames);
+    // Append directly to internal lists to preserve existing types
+    m_columnNames.append(columnName);
+    m_columnTypes.append(ColumnType::Integer);
     
-    QList<ColumnType> newColumnTypes = m_columnTypes;
-    newColumnTypes.append(type);
-    setColumnTypes(newColumnTypes);
-    
-    // Ensuite ajouter les valeurs à chaque ligne
+    // Ajouter les valeurs à chaque ligne
     for (int row = 0; row < rowCount(); ++row) {
         m_data[row].append(newColumnValues[row]);
     }
     
-    // Convertir les valeurs vers le type spécifié
-    int newColIdx = columnCount() - 1;
-    convertColumnValues(newColIdx, type);
+    // Auto-détecter le type basé sur les valeurs réelles
+    ColumnType finalType = detectColumnType(columnCount() - 1);
+    m_columnTypes[columnCount() - 1] = finalType;
     
     return true;
 }
 
 // Méthode d'évaluation d'expression simplifiée
-// Dans une version production, on utiliserait une bibliothèque d'évaluation d'expressions appropriée
 QVariant DataTable::evaluateExpression(const QString& expression) const
 {
-    // Implémentation très basique pour démonstration
-    // Une vraie implémentation aurait besoin d'un parseur d'expressions complet
+    QString expr = expression.trimmed();
     
     // Gestion des littéraux nuls
-    if (expression.trimmed() == "null") {
+    if (expr == "null") {
         return QVariant();
     }
     
     // Gestion des booléens
-    if (expression.trimmed() == "true") {
+    if (expr == "true") {
         return true;
     }
-    if (expression.trimmed() == "false") {
+    if (expr == "false") {
         return false;
     }
     
-    // Gestion des nombres entiers
-    bool ok;
-    int intValue = expression.toInt(&ok);
-    if (ok && !expression.contains('.') && !expression.contains('/') && !expression.contains(':')) {
-        return intValue;
-    }
-    
-    // Gestion des nombres décimaux
-    double doubleValue = expression.toDouble(&ok);
-    if (ok) {
-        return doubleValue;
-    }
-    
     // Gestion des chaînes (enlever les guillemets)
-    if (expression.startsWith('\"') && expression.endsWith('\"') && expression.length() >= 2) {
-        QString strValue = expression.mid(1, expression.length() - 2);
+    if (expr.startsWith('"') && expr.endsWith('"') && expr.length() >= 2) {
+        QString strValue = expr.mid(1, expr.length() - 2);
         strValue.replace("\\\"", "\"");
         return strValue;
     }
     
-    // Si on arrive ici, l'expression n'a pas pu être évaluée
-    // Dans une vraie implémentation, on lancerait une exception ou retournerait un d'erreur
-    return QVariant(); // Retourner une valeur nulle indiquant une erreur
+    // Gestion des nombres entiers
+    bool ok;
+    int intValue = expr.toInt(&ok);
+    if (ok) {
+        return intValue;
+    }
+    
+    // Gestion des nombres décimaux
+    double doubleValue = expr.toDouble(&ok);
+    if (ok) {
+        return doubleValue;
+    }
+    
+    // Recherche d'opérateurs arithmétiques avec précédence correcte
+    // Règle: * / % ont précédence sur + -
+    // Trouver le premier * / % (de gauche à droite)
+    
+    // Chercher * / % (priorité haute)
+    int mulDivPos = -1;
+    for (int i = 0; i < expr.length(); ++i) {
+        if (expr[i] == '*' || expr[i] == '/' || expr[i] == '%') {
+            mulDivPos = i;
+            break;
+        }
+    }
+    
+    if (mulDivPos > 0) {
+        QString leftStr = expr.left(mulDivPos).trimmed();
+        // Le côté droit: s'arrêter au premier + ou - (plus basse priorité)
+        int rightEnd = expr.length();
+        for (int i = mulDivPos + 1; i < expr.length(); ++i) {
+            if (expr[i] == '+' || expr[i] == '-') {
+                rightEnd = i;
+                break;
+            }
+        }
+        QString rightStr = expr.mid(mulDivPos + 1, rightEnd - mulDivPos - 1).trimmed();
+        QVariant leftVal = evaluateExpression(leftStr);
+        QVariant rightVal = evaluateExpression(rightStr);
+        QVariant mulResult = evaluateBinaryOp(leftVal, rightVal, expr[mulDivPos]);
+        
+        // S'il reste quelque chose après (comme "+6"), l'ajouter au résultat
+        if (rightEnd < expr.length()) {
+            QString remaining = expr.mid(rightEnd).trimmed();
+            if (!remaining.isEmpty()) {
+                QVariant remainingVal = evaluateExpression(remaining);
+                QChar op = expr[rightEnd];
+                return evaluateBinaryOp(mulResult, remainingVal, op);
+            }
+        }
+        return mulResult;
+    }
+    
+    // Pas de * / %, chercher + - (priorité basse)
+    int addSubPos = -1;
+    for (int i = 0; i < expr.length(); ++i) {
+        if (expr[i] == '+' || expr[i] == '-') {
+            addSubPos = i;
+            break;
+        }
+    }
+    
+    if (addSubPos > 0) {
+        QString leftStr = expr.left(addSubPos).trimmed();
+        QString rightStr = expr.mid(addSubPos + 1).trimmed();
+        QVariant leftVal = evaluateExpression(leftStr);
+        QVariant rightVal = evaluateExpression(rightStr);
+        return evaluateBinaryOp(leftVal, rightVal, expr[addSubPos]);
+    }
+    
+    return QVariant();
+}
+
+int DataTable::findOperatorOutsideParens(const QString& expr, QChar op) const
+{
+    int parenDepth = 0;
+    for (int i = 0; i < expr.length(); ++i) {
+        QChar c = expr[i];
+        if (c == '(') {
+            parenDepth++;
+        } else if (c == ')') {
+            parenDepth = qMax(0, parenDepth - 1);
+        } else if (parenDepth == 0 && c == op) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+QVariant DataTable::evaluateBinaryOp(const QVariant& left, const QVariant& right, QChar op) const
+{
+    if (left.isNull() || right.isNull()) {
+        qWarning() << "evaluateBinaryOp: null operand" << left << right;
+        return QVariant();
+    }
+    
+    bool leftOk, rightOk;
+    double leftNum = toDouble(left, &leftOk);
+    double rightNum = toDouble(right, &rightOk);
+    
+    if (!leftOk || !rightOk) {
+        qWarning() << "evaluateBinaryOp: conversion failed" << left << right << leftOk << rightOk;
+        return QVariant();
+    }
+    
+    switch (op.unicode()) {
+    case '+':
+        if (left.typeId() == QMetaType::Int && right.typeId() == QMetaType::Int) {
+            return left.toInt() + right.toInt();
+        }
+        return leftNum + rightNum;
+    case '-':
+        if (left.typeId() == QMetaType::Int && right.typeId() == QMetaType::Int) {
+            return left.toInt() - right.toInt();
+        }
+        return leftNum - rightNum;
+    case '*':
+        if (left.typeId() == QMetaType::Int && right.typeId() == QMetaType::Int) {
+            return left.toInt() * right.toInt();
+        }
+        return leftNum * rightNum;
+    case '/':
+        if (rightNum == 0.0) {
+            return QVariant();
+        }
+        if (left.typeId() == QMetaType::Int && right.typeId() == QMetaType::Int && left.toInt() % right.toInt() == 0) {
+            return left.toInt() / right.toInt();
+        }
+        return leftNum / rightNum;
+    case '%':
+        if (left.typeId() == QMetaType::Int && right.typeId() == QMetaType::Int && right.toInt() != 0) {
+            return left.toInt() % right.toInt();
+        }
+        return QVariant();
+    default:
+        return QVariant();
+    }
+}
+
+double DataTable::toDouble(const QVariant& value, bool* ok) const
+{
+    if (value.typeId() == QMetaType::Double) {
+        *ok = true;
+        return value.toDouble();
+    }
+    if (value.typeId() == QMetaType::Int || value.typeId() == QMetaType::LongLong) {
+        *ok = true;
+        return value.toDouble();
+    }
+    if (value.typeId() == QMetaType::Bool) {
+        *ok = true;
+        return value.toBool() ? 1.0 : 0.0;
+}
+    *ok = false;
+    return 0.0;
 }
