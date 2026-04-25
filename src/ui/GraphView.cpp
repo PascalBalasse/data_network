@@ -1481,6 +1481,11 @@ void GraphView::showNodeContextMenu(const QUuid& nodeId, const QPoint& globalPos
         connect(selectColumnsAction,&QAction::triggered, this,[this](){
             emit transformationRequested(dn::core::TransformationType::SelectColumns);
         });
+        
+        QAction* calculatedColumnAction=transfColMenu->addAction(tr("Colonne calculée"));
+        connect(calculatedColumnAction,&QAction::triggered, this,[this](){
+            emit transformationRequested(dn::core::TransformationType::CalculatedColumn);
+        });
 
         QMenu* transfRowMenu = transfMenu->addMenu(tr("Transformer les lignes"));
         QAction* filterAction=transfRowMenu->addAction(tr("Filter les lignes"));

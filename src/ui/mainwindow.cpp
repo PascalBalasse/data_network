@@ -12,6 +12,8 @@
 #include "dialogs/customjsondialog.h"
 #include "dialogs/customxmldialog.h"
 #include "dialogs/customwebdialog.h"
+#include "dialogs/customcalculatedcolumndialog.h"
+#include "dialogs/custompdfdialog.h"
 
 #include "../network/connectors/CSVConnector.h"
 #include "../network/connectors/TXTConnector.h"
@@ -22,12 +24,10 @@
 #include "../network/connectors/SQLConnector.h"
 #include "../network/connectors/XMLConnector.h"
 #include "../network/connectors/WebConnector.h"
-#include "dialogs/customcsvdialog.h"
-#include "dialogs/customexceldialog.h"
-#include "dialogs/custompdfdialog.h"
 #include "../network/transformations/FilterTransformation.h"
 #include "../network/transformations/SelectColumnsTransformation.h"
 #include "../network/transformations/RenameColumnsTransformation.h"
+#include "../network/transformations/CalculatedColumnTransformation.h"
 
 #include <QInputDialog>
 #include <QFileDialog>
@@ -96,9 +96,6 @@ void MainWindow::setupConnections(){
     connect(ui->actionEnregistrer_sous,&QAction::triggered,this,&MainWindow::onSaveNetworkAs);
 
 
-    // connection des boutons aux slots
-    connect(ui->renameColumnsButton, &QPushButton::clicked,
-            this, &MainWindow::onRenameColumns);
     connect(ui->tableView->selectionModel(), &QItemSelectionModel::currentChanged,
            this, &MainWindow::onTableRowSelected);
     connect(ui->tableView, &QWidget::customContextMenuRequested,
@@ -153,6 +150,9 @@ void MainWindow::setupConnections(){
         case dn::core::TransformationType::SelectColumns:
             onSelectColumns();
             break;
+        case dn::core::TransformationType::CalculatedColumn:
+            onAddCalculatedColumn();
+            break;
 
         default:
             break;
@@ -198,8 +198,6 @@ void MainWindow::setupConnections(){
 
 void MainWindow::setUiEnabled(bool enabled)
 {
-    ui->renameColumnsButton->setEnabled(enabled);
-
     // Changer le curseur pour indiquer l'activité
     if (!enabled) {
         QApplication::setOverrideCursor(Qt::WaitCursor);
@@ -312,6 +310,11 @@ void MainWindow::onSelectColumns()
     queueOperation([this]() { doSelectColumns(); });
 }
 
+void MainWindow::onAddCalculatedColumn()
+{
+    queueOperation([this]() { doAddCalculatedColumn(); });
+}
+
 void MainWindow::onRenameColumns()
 {
      queueOperation([this]() { doRenameColumns(); });
@@ -419,11 +422,11 @@ void MainWindow::onTableRowSelected(const QModelIndex &current, const QModelInde
 void MainWindow::onTableContextMenuRequested(const QPoint& pos)
 {
     QMenu contextMenu(this);
-    QAction* titleAction = contextMenu.addAction(tr("Menu colonnes (bientot disponible)"));
+    QAction* titleAction = contextMenu.addAction(tr("Actions colonnes"));
     titleAction->setEnabled(false);
     contextMenu.addSeparator();
-    QAction* placeholderAction = contextMenu.addAction(tr("Action factice"));
-    placeholderAction->setEnabled(false);
+    QAction* renameColumnsAction = contextMenu.addAction(tr("Renommer les colonnes"));
+    connect(renameColumnsAction, &QAction::triggered, this, &MainWindow::onRenameColumns);
 
     contextMenu.exec(ui->tableView->viewport()->mapToGlobal(pos));
 }
@@ -1325,13 +1328,13 @@ void MainWindow::doSelectColumns()
 {
     if (!checkNodeHasData("Veuillez d'abord charger des données ou sélectionner un nœud contenant des données."))
         return;
-
+    
     const DataTable& table = m_selectedNode->getCachedResult();
-
+    
     // Utiliser le nouveau dialogue
     QStringList columns;
     QString nodeName;
-
+    
     if (!CustomSelectColumnsDialog::getSelectedColumns(this, &table, columns, &nodeName)) {
         // L'utilisateur a annulé
         m_isProcessing = false;
@@ -1339,7 +1342,7 @@ void MainWindow::doSelectColumns()
         processNextOperation();
         return;
     }
-
+    
     // Vérifier qu'au moins une colonne est sélectionnée
     if (columns.isEmpty()) {
         QMessageBox::warning(this, "Erreur",
@@ -1349,23 +1352,83 @@ void MainWindow::doSelectColumns()
         processNextOperation();
         return;
     }
-
+    
     // Créer et ajouter la transformation
     auto* trans = new SelectColumnsTransformation(columns, this);
     RuntimeNode* parentNode = m_selectedNode; // Save parent before onNodeAdded modifies m_selectedNode
     const QString safeNodeName = nodeName.trimmed().isEmpty() ? trans->description() : nodeName.trimmed();
     auto* selectNode = m_network.createTransformationNode(trans,m_selectedNode, safeNodeName);
-
+    
     connect(selectNode, &RuntimeNode::tableChanged,this, &MainWindow::onNodeTableChanged);
-
+    
     onNodeAdded(selectNode); // ajout du nouveau noeud sur le graphique
     AddConnection(parentNode, selectNode); // ajout de la connection sur le graphique
     //ui->graphView->selectNewNode(selectNode->getId()); // sélectiooner le nouveau noeud
-
+    
     statusBar()->showMessage(tr("Sélection de colonnes: %1 colonnes conservées sur %2")
                                  .arg(columns.size())
                                  .arg(table.columnCount()), 3000);
+    
+    m_isProcessing = false;
+    setUiEnabled(true);
+    processNextOperation();
+}
 
+void MainWindow::doAddCalculatedColumn()
+{
+    if (!checkNodeHasData("Veuillez d'abord charger des données ou sélectionner un nœud contenant des données."))
+        return;
+    
+    const DataTable& table = m_selectedNode->getCachedResult();
+    
+    // Utiliser le dialogue pour créer une colonne calculée
+    QString columnName;
+    QString expression;
+    dn::core::ColumnType columnType;
+    
+    if (!CustomCalculatedColumnDialog::getCalculatedColumnDetails(this, &table, columnName, expression, columnType)) {
+        // L'utilisateur a annulé
+        m_isProcessing = false;
+        setUiEnabled(true);
+        processNextOperation();
+        return;
+    }
+    
+    // Vérifier que le nom de colonne n'est pas vide
+    if (columnName.isEmpty()) {
+        QMessageBox::warning(this, "Erreur",
+                             "Veuillez saisir un nom pour la colonne calculée.");
+        m_isProcessing = false;
+        setUiEnabled(true);
+        processNextOperation();
+        return;
+    }
+    
+    // Vérifier que l'expression n'est pas vide
+    if (expression.isEmpty()) {
+        QMessageBox::warning(this, "Erreur",
+                             "Veuillez saisir une expression pour la colonne calculée.");
+        m_isProcessing = false;
+        setUiEnabled(true);
+        processNextOperation();
+        return;
+    }
+    
+    // Créer et ajouter la transformation de colonne calculée
+    auto* calc = new CalculatedColumnTransformation(columnName, expression, columnType, this);
+    RuntimeNode* parentNode = m_selectedNode; // Save parent before onNodeAdded modifies m_selectedNode
+    const QString safeNodeName = columnName.trimmed().isEmpty() ? calc->description() : columnName.trimmed();
+    auto* calcNode = m_network.createTransformationNode(calc, m_selectedNode, safeNodeName);
+    
+    connect(calcNode, &RuntimeNode::tableChanged, this, &MainWindow::onNodeTableChanged);
+    
+    onNodeAdded(calcNode); // ajout du nouveau noeud sur le graphique
+    AddConnection(parentNode, calcNode); // ajout de la connection sur le graphique
+    
+    statusBar()->showMessage(tr("Colonne calculée ajoutée: %1 (%2)")
+                                 .arg(columnName)
+                                 .arg(expression), 3000);
+    
     m_isProcessing = false;
     setUiEnabled(true);
     processNextOperation();

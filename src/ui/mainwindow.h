@@ -65,6 +65,7 @@ void onLoadXMLData();
     void onAddFilter();
     void onSelectColumns();
     void onRenameColumns();
+    void onAddCalculatedColumn();
 
     //══════════════════════════════════════════════════════════════════
     // Slots internes
@@ -141,6 +142,7 @@ private:
     void doAddFilter();
     void doSelectColumns();
     void doRenameColumns();
+    void doAddCalculatedColumn();
     void doClearNetwork();
     void AddConnection(dn::nodes::RuntimeNode* source, dn::nodes::RuntimeNode* target);
 

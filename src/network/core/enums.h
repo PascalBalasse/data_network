@@ -81,7 +81,8 @@ enum class ConnectorType{
      */
     enum class TransformationType{
         Filter,          ///< Filtrage des lignes selon une condition
-        SelectColumns   ///< Sélection d'un sous-ensemble de colonnes
+        SelectColumns,   ///< Sélection d'un sous-ensemble de colonnes
+        CalculatedColumn ///< Création d'une colonne basée sur une expression
     };
 
     /**

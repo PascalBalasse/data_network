@@ -44,10 +44,9 @@ qt_add_executable(data_network
     src/network/transformations/Transformation.cpp
     src/network/transformations/FilterTransformation.h
     src/network/transformations/FilterTransformation.cpp
-    src/network/transformations/SelectColumnsTransformation.h
     src/network/transformations/SelectColumnsTransformation.cpp
-    src/network/transformations/RenameColumnsTransformation.h
     src/network/transformations/RenameColumnsTransformation.cpp
+    src/network/transformations/CalculatedColumnTransformation.cpp
     src/network/connectors/DataConnector.h
     src/network/connectors/DataConnector.cpp
     src/network/connectors/CSVConnector.h
