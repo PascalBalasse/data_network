@@ -65,19 +65,6 @@ namespace dn::dialogs{
                 this, &CustomCalculatedColumnDialog::onColumnDoubleClicked);
         mainLayout->addWidget(m_columnList);
         
-        // Type de colonne
-        QFormLayout* typeLayout = new QFormLayout();
-        m_typeCombo = new QComboBox();
-        m_typeCombo->addItem("Auto (détection)", static_cast<int>(dn::core::ColumnType::Any));
-        m_typeCombo->addItem("Texte (String)", static_cast<int>(dn::core::ColumnType::String));
-        m_typeCombo->addItem("Nombre entier (Integer)", static_cast<int>(dn::core::ColumnType::Integer));
-        m_typeCombo->addItem("Nombre décimal (Double)", static_cast<int>(dn::core::ColumnType::Double));
-        m_typeCombo->addItem("Booléen (Boolean)", static_cast<int>(dn::core::ColumnType::Boolean));
-        m_typeCombo->addItem("Date", static_cast<int>(dn::core::ColumnType::Date));
-        m_typeCombo->addItem("Date et heure", static_cast<int>(dn::core::ColumnType::DateTime));
-        typeLayout->addRow("Type de colonne :", m_typeCombo);
-        mainLayout->addLayout(typeLayout);
-        
         // Boutons OK/Annuler
         QHBoxLayout* buttonsLayout = new QHBoxLayout();
         buttonsLayout->addStretch();

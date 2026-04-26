@@ -40,6 +40,8 @@ qt_add_executable(data_network
 
     src/network/core/DataTable.h
     src/network/core/DataTable.cpp
+    src/network/core/ExpressionEvaluator.h
+    src/network/core/ExpressionEvaluator.cpp
     src/network/transformations/Transformation.h
     src/network/transformations/Transformation.cpp
     src/network/transformations/FilterTransformation.h

@@ -1588,6 +1588,7 @@ void MainWindow::onDeleteNode(const QUuid& nodeId)
 
     if (reply == QMessageBox::Yes) {
         m_network.removeNode(node);
+        ui->graphView->removeNode(nodeId);
         if (m_selectedNode == node) {
             m_selectedNode = nullptr;
             m_tableModel->setTable(nullptr);

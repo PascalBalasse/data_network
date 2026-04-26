@@ -24,7 +24,6 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QMessageBox>
-#include <QComboBox>
 
 namespace dn::dialogs{
 
@@ -39,9 +38,7 @@ namespace dn::dialogs{
         /// Retourne les détails de la colonne calculée à créer
         QString getColumnName() const { return m_columnNameEdit->text(); }
         QString getExpression() const { return m_expressionEdit->toPlainText(); }
-        dn::core::ColumnType getColumnType() const { 
-            return static_cast<dn::core::ColumnType>(m_typeCombo->currentData().toInt()); 
-        }
+        dn::core::ColumnType getColumnType() const { return dn::core::ColumnType::Any; }
 
         /// Méthode statique simplifiée
         static bool getCalculatedColumnDetails(QWidget *parent,
@@ -68,7 +65,6 @@ namespace dn::dialogs{
         QLineEdit *m_columnNameEdit;
         QTextEdit *m_expressionEdit;
         QListWidget *m_columnList;
-        QComboBox *m_typeCombo;
         QLabel *m_previewLabel;
         QPushButton *m_okButton;
         QPushButton *m_previewButton;

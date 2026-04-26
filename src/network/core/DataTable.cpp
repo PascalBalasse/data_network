@@ -11,9 +11,9 @@
  */
 
 #include "DataTable.h"
-
-#include <QDate>
+#include "ExpressionEvaluator.h"
 #include <QRegularExpression>
+#include <QDateTime>
 
 using namespace dn::core;
 
@@ -379,117 +379,74 @@ bool DataTable::addCalculatedColumn(const QString& columnName,
     }
     
     // Parser l'expression pour extraire les références de colonnes
-    QSet<int> referencedColumns;
-    QString parsedExpression = expression;
+    QMap<QString, int> columnRefs;
+    QString jsExpression = expression;
+    
+    qDebug() << "Parsing expression:" << jsExpression;
     
     int searchPos = 0;
     while (true) {
-        int bracketStart = parsedExpression.indexOf('[', searchPos);
+        int bracketStart = jsExpression.indexOf('[', searchPos);
         if (bracketStart == -1) break;
-        int bracketEnd = parsedExpression.indexOf(']', bracketStart);
+        int bracketEnd = jsExpression.indexOf(']', bracketStart);
         if (bracketEnd == -1) break;
         
-        QString colName = parsedExpression.mid(bracketStart + 1, bracketEnd - bracketStart - 1);
+        QString colName = jsExpression.mid(bracketStart + 1, bracketEnd - bracketStart - 1);
         int colIdx = columnIndex(colName);
         if (colIdx == -1) {
+            qDebug() << "Column not found:" << colName;
             return false;
         }
-        referencedColumns.insert(colIdx);
-        parsedExpression.replace(bracketStart, bracketEnd - bracketStart + 1, 
-                                QString("COL_%1").arg(colIdx));
-        searchPos = bracketStart;
+        
+        QString safeName = colName;
+        safeName.replace(QRegularExpression("[^a-zA-Z0-9_]"), "_");
+        columnRefs[colName] = colIdx;
+        jsExpression.replace(bracketStart, bracketEnd - bracketStart + 1, safeName);
+        searchPos = bracketStart + safeName.length();
+        qDebug() << "After replacement:" << jsExpression << "searchPos:" << searchPos;
     }
     
-// Préparer l'expression pour l'évaluation en remplaçant les marqueurs
-    // Par exemple: "[Col1] + [Col2]" devient "value(0) + value(1)"
-    QString evalExpression = parsedExpression;
+    qDebug() << "Final expression for evaluator:" << jsExpression;
+    qDebug() << "Column refs:" << columnRefs;
     
-    QList<QPair<int, int>> markerPositions;
-    QRegularExpression colMarkerRe("COL_(\\d+)");
-    QRegularExpressionMatchIterator markerIt = colMarkerRe.globalMatch(evalExpression);
-    while (markerIt.hasNext()) {
-        QRegularExpressionMatch m = markerIt.next();
-        markerPositions.append(qMakePair(m.capturedStart(), m.captured(1).toInt()));
-    }
-    
-    for (int i = markerPositions.size() - 1; i >= 0; --i) {
-        int pos = markerPositions[i].first;
-        int colIdx = markerPositions[i].second;
-        evalExpression.replace(pos, 5, QString("value(%1)").arg(colIdx));
-    }
-    
-    // Calculer les valeurs pour chaque ligne
+    // Créer l'évaluateur et calculer pour chaque ligne
     QList<QVariant> newColumnValues;
     newColumnValues.reserve(rowCount());
     
+    qDebug() << "addCalculatedColumn: rowCount=" << rowCount() << "expression=" << expression;
+    
     for (int row = 0; row < rowCount(); ++row) {
-        auto valueAt = [this, row](int colIndex) -> QVariant {
-            return this->value(row, colIndex);
-        };
+        ExpressionEvaluator evaluator;
         
-        QString rowExpression = evalExpression;
-        QRegularExpression valueRe("value\\((\\d+)\\)");
-        QRegularExpressionMatchIterator valueIt = valueRe.globalMatch(rowExpression);
-        
-        QList<QPair<int, QString>> replacements;
-        while (valueIt.hasNext()) {
-            QRegularExpressionMatch match = valueIt.next();
-            int colIdx = match.captured(1).toInt();
-            QVariant cellValue = valueAt(colIdx);
-            
-            QString valueStr;
-            if (cellValue.isNull()) {
-                valueStr = "null";
-            } else {
-                switch (cellValue.typeId()) {
-                    case QMetaType::Bool:
-                        valueStr = cellValue.toBool() ? "true" : "false";
-                        break;
-                    case QMetaType::Int:
-                        valueStr = QString::number(cellValue.toInt());
-                        break;
-                    case QMetaType::Double:
-                        valueStr = QString::number(cellValue.toDouble());
-                        break;
-                    case QMetaType::QString:
-                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('"', "\\\""));
-                        break;
-                    case QMetaType::QDate:
-                        valueStr = QString("\"%1\"").arg(cellValue.toDate().toString(Qt::ISODate));
-                        break;
-                    case QMetaType::QDateTime:
-                        valueStr = QString("\"%1\"").arg(cellValue.toDateTime().toString(Qt::ISODate));
-                        break;
-                    default:
-                        valueStr = QString("\"%1\"").arg(cellValue.toString().replace('"', "\\\""));
-                        break;
-                }
-            }
-            
-            replacements.append(qMakePair(match.capturedStart(), valueStr));
+        for (auto it = columnRefs.constBegin(); it != columnRefs.constEnd(); ++it) {
+            QString safeName = it.key();
+            safeName.replace(QRegularExpression("[^a-zA-Z0-9_]"), "_");
+            evaluator.setVariable(safeName, value(row, it.value()));
         }
         
-        for (int i = replacements.size() - 1; i >= 0; --i) {
-            int pos = replacements[i].first;
-            rowExpression.replace(pos, 8, replacements[i].second);
+        bool ok;
+        QVariant result = evaluator.evaluate(jsExpression, &ok);
+        if (!ok) {
+            qWarning() << "Expression evaluation failed for row" << row << ":" << evaluator.lastError();
+            result = QVariant();
         }
-        
-        // Évaluer l'expression
-        QVariant result = this->evaluateExpression(rowExpression);
+        qDebug() << "Row" << row << "result:" << result << "ok:" << ok;
         newColumnValues.append(result);
     }
     
-    // Ajouter la nouvelle colonne au tableau
-    // Append directly to internal lists to preserve existing types
+    // Ajouter la nouvelle colonne
     m_columnNames.append(columnName);
     m_columnTypes.append(ColumnType::Integer);
     
-    // Ajouter les valeurs à chaque ligne
     for (int row = 0; row < rowCount(); ++row) {
         m_data[row].append(newColumnValues[row]);
     }
     
-    // Auto-détecter le type basé sur les valeurs réelles
+    qDebug() << "After appending data, column" << columnName << "values:";
+    for (int row = 0; row < rowCount(); ++row) {
+        qDebug() << "  Row" << row << ":" << value(row, columnCount() - 1);
+    }
+    
     ColumnType finalType = detectColumnType(columnCount() - 1);
     m_columnTypes[columnCount() - 1] = finalType;
     
