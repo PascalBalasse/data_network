@@ -75,7 +75,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_tableModel = std::make_unique<DataTableModel>(this);
     ui->tableView->setModel(m_tableModel.get());
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectColumns);
-    ui->tableView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     auto* header = new TwoLineHeader(Qt::Horizontal, ui->tableView);
     ui->tableView->setHorizontalHeader(header);
@@ -98,8 +97,8 @@ void MainWindow::setupConnections(){
 
     connect(ui->tableView->selectionModel(), &QItemSelectionModel::currentChanged,
            this, &MainWindow::onTableRowSelected);
-    connect(ui->tableView, &QWidget::customContextMenuRequested,
-            this, &MainWindow::onTableContextMenuRequested);
+    connect(ui->tableView, &dn::ui::TableView::renameColumnsRequested,
+            this, &MainWindow::onRenameColumns);
 
     // Connexion des signaux émis par le réseau
     connect(&m_network, &Network::nodeAdded, this, &MainWindow::onNodeAdded);
@@ -419,17 +418,6 @@ void MainWindow::onTableRowSelected(const QModelIndex &current, const QModelInde
     statusBar()->showMessage(QString("Valeur: %1").arg(value.toString()), 2000);
 }
 
-void MainWindow::onTableContextMenuRequested(const QPoint& pos)
-{
-    QMenu contextMenu(this);
-    QAction* titleAction = contextMenu.addAction(tr("Actions colonnes"));
-    titleAction->setEnabled(false);
-    contextMenu.addSeparator();
-    QAction* renameColumnsAction = contextMenu.addAction(tr("Renommer les colonnes"));
-    connect(renameColumnsAction, &QAction::triggered, this, &MainWindow::onRenameColumns);
-
-    contextMenu.exec(ui->tableView->viewport()->mapToGlobal(pos));
-}
 
 void MainWindow::updateTablePreview(const DataTable& table)
 {
@@ -1328,13 +1316,13 @@ void MainWindow::doSelectColumns()
 {
     if (!checkNodeHasData("Veuillez d'abord charger des données ou sélectionner un nœud contenant des données."))
         return;
-    
+
     const DataTable& table = m_selectedNode->getCachedResult();
-    
+
     // Utiliser le nouveau dialogue
     QStringList columns;
     QString nodeName;
-    
+
     if (!CustomSelectColumnsDialog::getSelectedColumns(this, &table, columns, &nodeName)) {
         // L'utilisateur a annulé
         m_isProcessing = false;
@@ -1342,7 +1330,7 @@ void MainWindow::doSelectColumns()
         processNextOperation();
         return;
     }
-    
+
     // Vérifier qu'au moins une colonne est sélectionnée
     if (columns.isEmpty()) {
         QMessageBox::warning(this, "Erreur",
@@ -1352,23 +1340,23 @@ void MainWindow::doSelectColumns()
         processNextOperation();
         return;
     }
-    
+
     // Créer et ajouter la transformation
     auto* trans = new SelectColumnsTransformation(columns, this);
     RuntimeNode* parentNode = m_selectedNode; // Save parent before onNodeAdded modifies m_selectedNode
     const QString safeNodeName = nodeName.trimmed().isEmpty() ? trans->description() : nodeName.trimmed();
     auto* selectNode = m_network.createTransformationNode(trans,m_selectedNode, safeNodeName);
-    
+
     connect(selectNode, &RuntimeNode::tableChanged,this, &MainWindow::onNodeTableChanged);
-    
+
     onNodeAdded(selectNode); // ajout du nouveau noeud sur le graphique
     AddConnection(parentNode, selectNode); // ajout de la connection sur le graphique
     //ui->graphView->selectNewNode(selectNode->getId()); // sélectiooner le nouveau noeud
-    
+
     statusBar()->showMessage(tr("Sélection de colonnes: %1 colonnes conservées sur %2")
                                  .arg(columns.size())
                                  .arg(table.columnCount()), 3000);
-    
+
     m_isProcessing = false;
     setUiEnabled(true);
     processNextOperation();
@@ -1378,14 +1366,14 @@ void MainWindow::doAddCalculatedColumn()
 {
     if (!checkNodeHasData("Veuillez d'abord charger des données ou sélectionner un nœud contenant des données."))
         return;
-    
+
     const DataTable& table = m_selectedNode->getCachedResult();
-    
+
     // Utiliser le dialogue pour créer une colonne calculée
     QString columnName;
     QString expression;
     dn::core::ColumnType columnType;
-    
+
     if (!CustomCalculatedColumnDialog::getCalculatedColumnDetails(this, &table, columnName, expression, columnType)) {
         // L'utilisateur a annulé
         m_isProcessing = false;
@@ -1393,7 +1381,7 @@ void MainWindow::doAddCalculatedColumn()
         processNextOperation();
         return;
     }
-    
+
     // Vérifier que le nom de colonne n'est pas vide
     if (columnName.isEmpty()) {
         QMessageBox::warning(this, "Erreur",
@@ -1403,7 +1391,7 @@ void MainWindow::doAddCalculatedColumn()
         processNextOperation();
         return;
     }
-    
+
     // Vérifier que l'expression n'est pas vide
     if (expression.isEmpty()) {
         QMessageBox::warning(this, "Erreur",
@@ -1413,22 +1401,22 @@ void MainWindow::doAddCalculatedColumn()
         processNextOperation();
         return;
     }
-    
+
     // Créer et ajouter la transformation de colonne calculée
     auto* calc = new CalculatedColumnTransformation(columnName, expression, columnType, this);
     RuntimeNode* parentNode = m_selectedNode; // Save parent before onNodeAdded modifies m_selectedNode
     const QString safeNodeName = columnName.trimmed().isEmpty() ? calc->description() : columnName.trimmed();
     auto* calcNode = m_network.createTransformationNode(calc, m_selectedNode, safeNodeName);
-    
+
     connect(calcNode, &RuntimeNode::tableChanged, this, &MainWindow::onNodeTableChanged);
-    
+
     onNodeAdded(calcNode); // ajout du nouveau noeud sur le graphique
     AddConnection(parentNode, calcNode); // ajout de la connection sur le graphique
-    
+
     statusBar()->showMessage(tr("Colonne calculée ajoutée: %1 (%2)")
                                  .arg(columnName)
                                  .arg(expression), 3000);
-    
+
     m_isProcessing = false;
     setUiEnabled(true);
     processNextOperation();

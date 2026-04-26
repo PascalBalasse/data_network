@@ -11,6 +11,7 @@
 #include "../transformations/FilterTransformation.h"
 #include "../transformations/SelectColumnsTransformation.h"
 #include "../transformations/RenameColumnsTransformation.h"
+#include "../transformations/CalculatedColumnTransformation.h"
 
 using namespace dn::transformations;
 using namespace dn::nodes;
@@ -72,5 +73,11 @@ void TransformationNode::syncParametersFromTransformation()
     else if (auto* select = dynamic_cast<dn::transformations::SelectColumnsTransformation*>(m_transformation)) {
     }
     else if (auto* rename = dynamic_cast<dn::transformations::RenameColumnsTransformation*>(m_transformation)) {
+    }
+    else if (auto* calc = dynamic_cast<dn::transformations::CalculatedColumnTransformation*>(m_transformation)) {
+        // Pour les colonnes calculées, on stocke l'expression et le nom de colonne
+        setParameter("columnName", calc->getColumnName());
+        setParameter("expression", calc->getExpression());
+        setParameter("columnType", QString::number(static_cast<int>(calc->getColumnType())));
     }
 }

@@ -81,7 +81,6 @@ void onLoadXMLData();
     void onGraphNodeSelected(const QUuid& nodeId);
     void onNetworkChanged();
     void onTableRowSelected(const QModelIndex &current, const QModelIndex &previous);
-    void onTableContextMenuRequested(const QPoint& pos);
 
     void updateTablePreview(const dn::core::DataTable& table);
 

@@ -25,30 +25,6 @@
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <layout class="QHBoxLayout" name="toolbarLayout">
-      <item>
-       <widget class="QPushButton" name="renameColumnsButton">
-        <property name="text">
-         <string>Rename Columns</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Orientation::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-     </layout>
-    </item>
-    <item>
      <widget class="QSplitter" name="splitter">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -60,7 +36,7 @@
        <enum>Qt::Orientation::Horizontal</enum>
       </property>
       <widget class="dn::ui::GraphView" name="graphView"/>
-      <widget class="QTableView" name="tableView">
+      <widget class="dn::ui::TableView" name="tableView">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
          <horstretch>0</horstretch>
@@ -130,6 +106,11 @@
    <class>dn::ui::GraphView</class>
    <extends>QGraphicsView</extends>
    <header>GraphView.h</header>
+  </customwidget>
+  <customwidget>
+   <class>dn::ui::TableView</class>
+   <extends>QTableView</extends>
+   <header>TableView.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

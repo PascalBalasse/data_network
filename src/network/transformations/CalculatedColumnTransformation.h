@@ -38,6 +38,11 @@ public:
     /// Retourne la description
     QString description() const override;
 
+    /// Getters pour les propriétés de la transformation
+    QString getColumnName() const { return m_columnName; }
+    QString getExpression() const { return m_expression; }
+    dn::core::ColumnType getColumnType() const { return m_columnType; }
+
 private:
     QString m_columnName;
     QString m_expression;

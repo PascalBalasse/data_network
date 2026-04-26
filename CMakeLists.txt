@@ -71,7 +71,8 @@ qt_add_executable(data_network
     src/ui/GraphView.cpp
     src/ui/CustomShapeItem.h
     src/ui/CustomShapeItem.cpp
-
+    src/ui/tableview.h
+    src/ui/GraphView.cpp
 
     src/network/nodes/RuntimeNode.h
     src/network/nodes/RuntimeNode.cpp
@@ -125,6 +126,7 @@ qt_add_executable(data_network
     src/ui/dialogs/customcalculatedcolumndialog.h
     src/ui/dialogs/customcalculatedcolumndialog.cpp
     src/network/core/enums.h
+    src/ui/tableview.cpp
 )
 
 # -------------------------

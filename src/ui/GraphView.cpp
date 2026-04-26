@@ -1477,12 +1477,12 @@ void GraphView::showNodeContextMenu(const QUuid& nodeId, const QPoint& globalPos
         // Sous-menu pour les fichiers
         QMenu* transfMenu = contextMenu.addMenu(tr("Transformer les données"));
         QMenu* transfColMenu = transfMenu->addMenu(tr("Transformer les colonnes"));
-        QAction* selectColumnsAction=transfColMenu->addAction(tr("Sélectionner les colonnes"));
+        QAction* selectColumnsAction=transfColMenu->addAction(tr("Supprimer des colonnes"));
         connect(selectColumnsAction,&QAction::triggered, this,[this](){
             emit transformationRequested(dn::core::TransformationType::SelectColumns);
         });
         
-        QAction* calculatedColumnAction=transfColMenu->addAction(tr("Colonne calculée"));
+        QAction* calculatedColumnAction=transfColMenu->addAction(tr("Ajouter une colonne calculée"));
         connect(calculatedColumnAction,&QAction::triggered, this,[this](){
             emit transformationRequested(dn::core::TransformationType::CalculatedColumn);
         });
@@ -1507,11 +1507,14 @@ void GraphView::showNodeContextMenu(const QUuid& nodeId, const QPoint& globalPos
             break;
 
         case NodeType::Transform:
-            editAction = contextMenu.addAction(tr("Modifier la transformation"));
+            // Transformation editing now done via double-click
+            // editAction = contextMenu.addAction(tr("Modifier la transformation"));
+            computeAction = contextMenu.addAction(tr("Recalculer depuis ce nœud"));
             break;
 
         case NodeType::Merge:
-            editAction = contextMenu.addAction(tr("Configurer la fusion"));
+            // editAction = contextMenu.addAction(tr("Configurer la fusion"));
+            // Fusion configuration not yet implemented
 
             break;
 
