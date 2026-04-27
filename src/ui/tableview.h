@@ -3,6 +3,7 @@
 
 #include <QTableView>
 #include <QContextMenuEvent>
+#include "models/TwoLineHeader.h"
 
 namespace dn::ui {
 

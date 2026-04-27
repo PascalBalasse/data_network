@@ -2,6 +2,7 @@
 #define TWOLINEHEADER_H
 
 #include <QHeaderView>
+#include <QPainter>
 
 class TwoLineHeader : public QHeaderView
 {

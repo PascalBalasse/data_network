@@ -1,7 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "models/DataTableModel.h"
-#include "models/TwoLineHeader.h"
 #include "dialogs/customcsvdialog.h"
 #include "dialogs/customexceldialog.h"
 #include "dialogs/customfilterdialog.h"
@@ -68,17 +67,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     setupConnections();
 
-    // S'assurer que GraphView est visible
-    ui->graphView->setVisible(true);
-
     //instanciation du model pour la TableView
     m_tableModel = std::make_unique<DataTableModel>(this);
     ui->tableView->setModel(m_tableModel.get());
-    ui->tableView->setSelectionBehavior(QAbstractItemView::SelectColumns);
-
-    auto* header = new TwoLineHeader(Qt::Horizontal, ui->tableView);
-    ui->tableView->setHorizontalHeader(header);
-    header->setVisible(true);
 }
 
 MainWindow::~MainWindow()
@@ -324,30 +315,6 @@ void MainWindow::onClearNetwork(){
     queueOperation([this]() { doClearNetwork(); });
 }
 
-void MainWindow::onApplySteps()
-{
-    if (m_network.getAllNodes().isEmpty()) {
-        QMessageBox::information(this, "Info", "Aucune donnée chargée.");
-        return;
-    }
-
-    if (!m_network.validate()) {
-        QMessageBox::warning(this, "Erreur", "Le réseau contient des erreurs.");
-        return;
-    }
-
-    // Exécution directe sans file d'attente car c'est rapide
-    m_network.computeAll();
-
-    // si un noeud est sélectionné, il faut mettre à jour la table à droite
-    if (m_selectedNode) {
-        m_tableModel->setTable(&m_selectedNode->getCachedResult());
-        statusBar()->showMessage(tr("Réseau exécuté. Résultat: %1 lignes, %2 colonnes")
-                                     .arg(m_selectedNode->getCachedResult().rowCount())
-                                     .arg(m_selectedNode->getCachedResult().columnCount()), 3000);
-    }
-}
-
 
 // ========== SLOTS DES SIGNAUX DU RESEAU ==========
 
@@ -419,11 +386,6 @@ void MainWindow::onTableRowSelected(const QModelIndex &current, const QModelInde
 }
 
 
-void MainWindow::updateTablePreview(const DataTable& table)
-{
-    m_tableModel->setTable(&table);
-}
-
 QList<int> MainWindow::selectedTableColumns() const
 {
     QList<int> columns;
@@ -437,44 +399,6 @@ QList<int> MainWindow::selectedTableColumns() const
         }
     }
     return columns;
-}
-
-QString MainWindow::columnTypeToLabel(ColumnType type) const
-{
-    switch (type) {
-    case ColumnType::Integer: return tr("Entier");
-    case ColumnType::Double: return tr("Décimal");
-    case ColumnType::Boolean: return tr("Booléen");
-    case ColumnType::Date: return tr("Date");
-    case ColumnType::DateTime: return tr("Date et heure");
-    case ColumnType::List: return tr("Liste");
-    case ColumnType::Pair: return tr("Paire");
-    case ColumnType::Table: return tr("Table");
-    case ColumnType::Any: return tr("Mixte");
-    default: return tr("Texte");
-    }
-}
-
-void MainWindow::applyTypeToSelectedColumns(ColumnType type)
-{
-    if (!m_selectedNode)
-        return;
-
-    const QList<int> columns = selectedTableColumns();
-    if (columns.isEmpty()) {
-        statusBar()->showMessage(tr("Aucune colonne sélectionnée."), 2000);
-        return;
-    }
-
-    DataTable& mutableTable = const_cast<DataTable&>(m_selectedNode->getCachedResult());
-    for (int col : columns) {
-        mutableTable.forceColumnType(col, type, true);
-    }
-
-    m_tableModel->setTable(&mutableTable);
-    statusBar()->showMessage(
-        tr("Type appliqué à %1 colonne(s): %2").arg(columns.size()).arg(columnTypeToLabel(type)),
-        3000);
 }
 
 
