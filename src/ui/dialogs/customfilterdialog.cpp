@@ -12,6 +12,7 @@
 #include <QStringListModel>
 #include <QSet>
 #include <QDebug>
+#include <QTimer>
 
 using namespace dn::dialogs;
 
@@ -20,7 +21,6 @@ CustomFilterDialog::CustomFilterDialog(const dn::core::DataTable* table,
     : QDialog(parent)
     , m_table(table)
     , m_isValid(false)
-    , m_matchingRows(0)
 {
     // Initialiser les opérateurs par type
     m_stringOperators = QStringList() << "Equals" << "Not Equals"
@@ -40,13 +40,21 @@ CustomFilterDialog::CustomFilterDialog(const dn::core::DataTable* table,
     }
 
     validateInputs();
+
+    // Déclencher manuellement onColumnChanged si une colonne est sélectionnée
+    if (m_columnCombo->currentIndex() >= 0) {
+        // Forcer le signal car addItems() ne le déclenche pas
+        QTimer::singleShot(0, this, [this]() {
+            onColumnChanged(m_columnCombo->currentIndex());
+        });
+    }
 }
+
 
 void CustomFilterDialog::setupUI()
 {
     setWindowTitle("Ajouter un filtre - Data Network");
     setMinimumWidth(500);
-    setMinimumHeight(600);
     setModal(true);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -88,26 +96,12 @@ void CustomFilterDialog::setupUI()
 
     m_suggestionsView = new QListView(this);
     m_suggestionsView->setMaximumHeight(120);
+    m_suggestionsView->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
     suggestionsLayout->addWidget(m_suggestionsView);
 
+    suggestionsGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+
     mainLayout->addWidget(suggestionsGroup);
-
-    // === Statistiques ===
-    m_statsLabel = new QLabel(this);
-    m_statsLabel->setStyleSheet("QLabel { background-color: #e8f0fe; padding: 8px; border-radius: 4px; }");
-    mainLayout->addWidget(m_statsLabel);
-
-    // === Aperçu ===
-    QGroupBox *previewGroup = new QGroupBox("Aperçu du filtre", this);
-    QVBoxLayout *previewLayout = new QVBoxLayout(previewGroup);
-
-    m_previewLabel = new QLabel(this);
-    m_previewLabel->setWordWrap(true);
-    m_previewLabel->setStyleSheet("QLabel { background-color: #f5f5f5; padding: 10px; border-radius: 5px; font-family: monospace; }");
-    m_previewLabel->setText("Sélectionnez les paramètres pour voir l'aperçu...");
-    previewLayout->addWidget(m_previewLabel);
-
-    mainLayout->addWidget(previewGroup);
 
     // === Statut ===
     m_statusLabel = new QLabel(this);
@@ -117,7 +111,6 @@ void CustomFilterDialog::setupUI()
     // === Boutons ===
     QHBoxLayout *buttonLayout = new QHBoxLayout();
 
-    m_previewButton = new QPushButton("Aperçu détaillé", this);
     m_okButton = new QPushButton("Appliquer le filtre", this);
     QPushButton *cancelButton = new QPushButton("Annuler", this);
 
@@ -125,7 +118,6 @@ void CustomFilterDialog::setupUI()
     m_okButton->setDefault(true);
     m_okButton->setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; }");
 
-    buttonLayout->addWidget(m_previewButton);
     buttonLayout->addStretch();
     buttonLayout->addWidget(m_okButton);
     buttonLayout->addWidget(cancelButton);
@@ -141,8 +133,6 @@ void CustomFilterDialog::setupUI()
             this, &CustomFilterDialog::onValueChanged);
     connect(m_suggestionsView, &QListView::clicked,
             this, &CustomFilterDialog::onValueSelected);
-    connect(m_previewButton, &QPushButton::clicked,
-            this, &CustomFilterDialog::onPreviewRequested);
     connect(m_okButton, &QPushButton::clicked,
             this, &CustomFilterDialog::onAccept);
     connect(cancelButton, &QPushButton::clicked,
@@ -176,14 +166,25 @@ void CustomFilterDialog::onColumnChanged(int index)
     }
 
     // Mettre à jour le combo des opérateurs
+    QString previousOp = m_operatorCombo->currentText();
     m_operatorCombo->clear();
     m_operatorCombo->addItems(m_currentOperators);
+
+    // Restaurer l'opérateur précédent si toujours valide
+    int newIndex = m_operatorCombo->findText(previousOp);
+    if (newIndex >= 0) {
+        m_operatorCombo->setCurrentIndex(newIndex);
+    } else {
+        m_operatorCombo->setCurrentIndex(0);
+    }
+
+    // Déclencher manuellement onOperatorChanged après initialisation
+    onOperatorChanged(m_operatorCombo->currentIndex());
 
     // Mettre à jour les valeurs uniques (converties selon le type)
     updateUniqueValues();
 
     validateInputs();
-    updatePreview();
 }
 
 void CustomFilterDialog::onOperatorChanged(int index)
@@ -202,14 +203,12 @@ void CustomFilterDialog::onOperatorChanged(int index)
     }
 
     validateInputs();
-    updatePreview();
 }
 
 void CustomFilterDialog::onValueChanged(const QString& text)
 {
     Q_UNUSED(text)
     validateInputs();
-    updatePreview();
 }
 
 void CustomFilterDialog::updateUniqueValues()
@@ -318,7 +317,7 @@ void CustomFilterDialog::validateInputs()
         QStringList parts = m_value.split(",", Qt::SkipEmptyParts);
         hasValue = (parts.size() == 2);
         if (!hasValue) {
-            m_statusLabel->setText("⚠️ Format requis: 'min,max' pour l'opérateur 'Between'");
+            m_statusLabel->setText("⚠️ Format requis : 'min,max' pour l'opérateur 'Between'");
         } else {
             m_statusLabel->setText("✓ Filtre valide");
         }
@@ -334,99 +333,6 @@ void CustomFilterDialog::validateInputs()
 
     m_isValid = hasValue && m_columnCombo->currentIndex() >= 0;
     m_okButton->setEnabled(m_isValid);
-
-    // Mettre à jour les statistiques
-    updatePreview();
-}
-
-void CustomFilterDialog::updatePreview()
-{
-    if (!m_isValid || !m_table) {
-        m_previewLabel->setText("Paramètres incomplets - aperçu non disponible");
-        m_statsLabel->setText("Sélectionnez une colonne et un opérateur pour voir les statistiques");
-        return;
-    }
-
-    // Calculer combien de lignes correspondent
-    m_matchingRows = 0;
-
-    // Pour un aperçu complet, il faudrait appliquer le filtre
-    // Version simplifiée pour l'instant
-    m_matchingRows = m_table->rowCount() / 2; // À remplacer par vrai calcul
-
-    QString preview;
-    QString operatorSymbol;
-
-    if (m_operator == "Equals") operatorSymbol = "==";
-    else if (m_operator == "Not Equals") operatorSymbol = "!=";
-    else if (m_operator == "Greater Than") operatorSymbol = ">";
-    else if (m_operator == "Less Than") operatorSymbol = "<";
-    else if (m_operator == "Greater or Equal") operatorSymbol = ">=";
-    else if (m_operator == "Less or Equal") operatorSymbol = "<=";
-    else if (m_operator == "Contains") operatorSymbol = "contains";
-    else if (m_operator == "Starts With") operatorSymbol = "starts with";
-    else if (m_operator == "Ends With") operatorSymbol = "ends with";
-    else if (m_operator == "Is Empty") operatorSymbol = "is empty";
-    else if (m_operator == "Is Not Empty") operatorSymbol = "is not empty";
-    else if (m_operator == "Between") operatorSymbol = "between";
-
-    if (m_operator == "Is Empty") {
-        preview = QString("Garder les lignes où <b>'%1'</b> %2")
-                      .arg(m_column, operatorSymbol);
-    }
-    else if (m_operator == "Is Not Empty") {
-        preview = QString("Garder les lignes où <b>'%1'</b> %2")
-                      .arg(m_column, operatorSymbol);
-    }
-    else if (m_operator == "Between") {
-        QStringList parts = m_value.split(",", Qt::SkipEmptyParts);
-        if (parts.size() == 2) {
-            preview = QString("Garder les lignes où <b>'%1'</b> %2 <b>%3</b> et <b>%4</b>")
-                          .arg(m_column, operatorSymbol, parts[0].trimmed(), parts[1].trimmed());
-        } else {
-            preview = QString("Garder les lignes où <b>'%1'</b> %2 ...")
-                          .arg(m_column, operatorSymbol);
-        }
-    }
-    else {
-        preview = QString("Garder les lignes où <b>'%1'</b> %2 <b>'%3'</b>")
-                      .arg(m_column, operatorSymbol, m_value);
-    }
-
-    m_previewLabel->setText(preview);
-
-    // Statistiques
-    int totalRows = m_table->rowCount();
-    double percentage = (m_matchingRows * 100.0) / totalRows;
-
-    m_statsLabel->setText(QString(
-                              "📊 <b>Statistiques :</b><br>"
-                              "• Total des lignes : %1<br>"
-                              "• Lignes correspondantes : %2<br>"
-                              "• Pourcentage : %3%"
-                              ).arg(totalRows).arg(m_matchingRows).arg(percentage, 0, 'f', 1));
-}
-
-void CustomFilterDialog::onPreviewRequested()
-{
-    if (m_isValid) {
-        QString message = "🔍 <b>Aperçu du filtre</b><br><br>" +
-                          m_previewLabel->text() + "<br><br>" +
-                          "✅ Le filtre est valide et prêt à être appliqué.<br><br>" +
-                          "<b>Résultat attendu :</b> " +
-                          QString::number(m_matchingRows) + " lignes sur " +
-                          QString::number(m_table->rowCount());
-
-        QMessageBox msgBox;
-        msgBox.setWindowTitle("Aperçu du filtre");
-        msgBox.setTextFormat(Qt::RichText);
-        msgBox.setText(message);
-        msgBox.setIcon(QMessageBox::Information);
-        msgBox.exec();
-    } else {
-        QMessageBox::warning(this, "Aperçu impossible",
-                             "Veuillez compléter tous les champs requis.");
-    }
 }
 
 void CustomFilterDialog::onAccept()
@@ -435,7 +341,7 @@ void CustomFilterDialog::onAccept()
         accept();
     } else {
         QMessageBox::warning(this, "Validation",
-                             "Veuillez remplir correctement tous les champs.");
+                               "Veuillez remplir correctement tous les champs.");
     }
 }
 

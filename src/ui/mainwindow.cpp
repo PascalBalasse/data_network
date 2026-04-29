@@ -1549,28 +1549,64 @@ void MainWindow::onEditNode(const QUuid& nodeId)
 
     // Selon le type du nœud, ouvrir le dialogue approprié
     switch (node->getNodeType()) {
-    case NodeType::Source:
-        // Recharger/modifier la source
-        onLoadCSVData(); // Ou dialogue spécifique
+    case NodeType::Source: {
+        // Vérifier quel type de source
+        if (node->getAllParameters().contains("connectorType")) {
+            QString connType = node->getParameter("connectorType");
+            if (connType == "CSV") { onLoadCSVData(); }
+            else if (connType == "TXT") { onLoadTXTData(); }
+            else if (connType == "Excel") { onLoadExcelData(); }
+            else if (connType == "PDF") { onLoadPDFData(); }
+            else if (connType == "FEC") { onLoadFECData(); }
+            else if (connType == "SQL") { onLoadSQLData(); }
+            else if (connType == "JSON") { onLoadJSONData(); }
+            else if (connType == "XML") { onLoadXMLData(); }
+            else if (connType == "Web") { onLoadWebData(); }
+        } else {
+            onLoadCSVData(); // Par défaut
+        }
         break;
+    }
 
-    case NodeType::Transform:
-        // Modifier la transformation
-        onAddFilter(); // Ou dialogue spécifique
+    case NodeType::Transform: {
+        // Récupérer le TransformationNode pour accéder à la transformation
+        auto* transNode = dynamic_cast<TransformationNode*>(node);
+        if (!transNode || !transNode->getTransformation()) break;
+
+        // Vérifier le type de transformation
+        if (dynamic_cast<FilterTransformation*>(transNode->getTransformation())) {
+            onAddFilter();
+        }
+        else if (dynamic_cast<SelectColumnsTransformation*>(transNode->getTransformation())) {
+            onSelectColumns();
+        }
+        else if (dynamic_cast<CalculatedColumnTransformation*>(transNode->getTransformation())) {
+            onAddCalculatedColumn();
+        }
+        else if (dynamic_cast<RenameColumnsTransformation*>(transNode->getTransformation())) {
+            onRenameColumns();
+        }
         break;
+    }
 
     case NodeType::Merge:
-        // Configurer la fusion
         QMessageBox::information(this, "Configurer fusion",
                                  "Configuration des fusions à implémenter.");
         break;
 
     case NodeType::Target:
         // Modifier la cible
-
+        if (node->getAllParameters().contains("connectorType")) {
+            QString connType = node->getParameter("connectorType");
+            if (connType == "CSV") { onSaveCSVData(); }
+            else if (connType == "TXT") { onSaveTXTData(); }
+            else if (connType == "Excel") { onSaveExcelData(); }
+            else if (connType == "XML") { onSaveXMLData(); }
+        }
         break;
     }
 }
+
 
 void MainWindow::onComputeFromNode(const QUuid& nodeId)
 {

@@ -1,4 +1,4 @@
-#include "tableview.h"
+#include "TableView.h"
 #include <QMenu>
 #include <QAction>
 

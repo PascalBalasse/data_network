@@ -49,8 +49,12 @@ namespace dn::network {
         QVector<RuntimeNode*> getAllNodes() const { return m_nodes; }
 
         // ========== CONNEXIONS ==========
-        // Déconnexion
+        // Connexion
+        bool addConnection(RuntimeNode* from, RuntimeNode* to, int inputSlot = 0);
         bool disconnectNodes(RuntimeNode* target, int inputSlot = 0);
+
+        // Obtenir les successeurs d'un nœud
+        QVector<RuntimeNode*> getSuccessors(RuntimeNode* node) const;
 
         // ========== EXÉCUTION ==========
         // Exécute tous les nœuds dans l'ordre topologique

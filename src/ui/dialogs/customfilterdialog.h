@@ -65,13 +65,11 @@ namespace dn::dialogs{
         void onOperatorChanged(int index);
         void onValueChanged(const QString& text);
         void onValueSelected(const QModelIndex& index);
-        void onPreviewRequested();
         void onAccept();
         void onReject();
 
     private:
         void setupUI();
-        void updatePreview();
         void validateInputs();
         void updateUniqueValues();
         void setupAutoComplete();
@@ -84,11 +82,8 @@ namespace dn::dialogs{
         QLineEdit *m_nameEdit;
         QLineEdit *m_valueEdit;
         QListView *m_suggestionsView;
-        QLabel *m_previewLabel;
-        QLabel *m_statsLabel;
         QLabel *m_statusLabel;
         QPushButton *m_okButton;
-        QPushButton *m_previewButton;
 
         //══════════════════════════════════════════════════════════════════
         // Données
@@ -99,7 +94,6 @@ namespace dn::dialogs{
         QString m_value;
         QString m_nodeName;
         bool m_isValid;
-        int m_matchingRows;
 
         //══════════════════════════════════════════════════════════════════
         // Opérateurs par type

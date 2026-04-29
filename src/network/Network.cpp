@@ -105,6 +105,42 @@ RuntimeNode* Network::findNode(QUuid id) const
 }
 
 
+QVector<RuntimeNode*> Network::getSuccessors(RuntimeNode* node) const
+{
+    QVector<RuntimeNode*> successors;
+    if (!node) {
+        return successors;
+    }
+
+    for (RuntimeNode* other : m_nodes) {
+        for (int i = 0; i < other->getInputsCount(); ++i) {
+            if (other->getInput(i) == node) {
+                successors.append(other);
+                break;
+            }
+        }
+    }
+
+    return successors;
+}
+
+bool Network::addConnection(RuntimeNode* from, RuntimeNode* to, int inputSlot)
+{
+    if (!from || !to) {
+        return false;
+    }
+
+    // Vérifier que 'to' peut accepter une entrée à ce slot
+    if (inputSlot < 0 || inputSlot >= to->getInputsCount()) {
+        return false;
+    }
+
+    // Connecter
+    to->setInput(inputSlot, from);
+    emit networkChanged();
+    return true;
+}
+
 bool Network::disconnectNodes(RuntimeNode* target, int inputSlot)
 {
     if (!target)
@@ -115,7 +151,7 @@ bool Network::disconnectNodes(RuntimeNode* target, int inputSlot)
 
     if (target->getInput(inputSlot)) {
         target->setInput(inputSlot, nullptr);
-       // emit connectionRemoved(target, inputSlot);
+        // emit connectionRemoved(target, inputSlot);
         emit networkChanged();
         return true;
     }
@@ -366,6 +402,84 @@ QJsonObject Network::toJson() const
 
 bool Network::fromJson(const QJsonObject& json)
 {
+    if (json.isEmpty()) {
+        return false;
+    }
+
+    // Vérifier la version
+    QString version = json["version"].toString();
+    if (version != "1.0") {
+        qWarning() << "Unsupported network version:" << version;
+        return false;
+    }
+
+    // Nettoyer le réseau actuel
+    for (RuntimeNode* node : m_nodes) {
+        delete node;
+    }
+    m_nodes.clear();
+    m_nodeMap.clear();
+
+    // Charger les nœuds
+    QJsonArray nodesArray = json["nodes"].toArray();
+    QHash<int, RuntimeNode*> indexToNode;
+
+    for (int i = 0; i < nodesArray.size(); ++i) {
+        QJsonObject nodeObj = nodesArray[i].toObject();
+        QString idStr = nodeObj["id"].toString();
+        QString name = nodeObj["name"].toString();
+        NodeType type = static_cast<NodeType>(nodeObj["type"].toInt());
+
+        QUuid id(idStr);
+        if (id.isNull()) {
+            qWarning() << "Invalid node ID:" << idStr;
+            continue;
+        }
+
+        RuntimeNode* node = nullptr;
+
+        switch (type) {
+        case NodeType::Source:
+            // Créer un SourceNode vide (connecteur sera configuré plus tard)
+            node = new SourceNode(nullptr, name, this);
+            break;
+        case NodeType::Transform:
+            // Créer un TransformationNode vide
+            node = new TransformationNode(nullptr, nullptr, name, this);
+            break;
+        case NodeType::Merge:
+            node = new MergeNode({}, MergeType::Union, {}, name, this);
+            break;
+        case NodeType::Target:
+            node = new TargetNode(nullptr, nullptr, name, this);
+            break;
+        }
+
+        if (node) {
+            // Restaurer l'ID original
+            // Note: Il faudrait idéalement pouvoir définir l'ID manuellement
+            m_nodes.append(node);
+            indexToNode[i] = node;
+            m_nodeMap[node->getId()] = node;
+        }
+    }
+
+    // Charger les connexions
+    QJsonArray connectionsArray = json["connections"].toArray();
+    for (const QJsonValue& connVal : connectionsArray) {
+        QJsonObject connObj = connVal.toObject();
+        int fromIndex = connObj["from"].toInt();
+        int toIndex = connObj["to"].toInt();
+        int slot = connObj["slot"].toInt();
+
+        if (indexToNode.contains(fromIndex) && indexToNode.contains(toIndex)) {
+            RuntimeNode* from = indexToNode[fromIndex];
+            RuntimeNode* to = indexToNode[toIndex];
+            if (slot < to->getInputsCount()) {
+                to->setInput(slot, from);
+            }
+        }
+    }
 
     return true;
 }

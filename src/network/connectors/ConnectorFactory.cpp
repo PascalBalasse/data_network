@@ -9,40 +9,42 @@
 #include "XMLConnector.h"
 #include "WebConnector.h"
 
-using namespace dn::core;
 using namespace dn::connectors;
 
-std::unique_ptr<DataConnector> ConnectorFactory::create(ConnectorType type)
+// Static registry storage
+QMap<ConnectorType, ConnectorFactory::CreatorFunc>& ConnectorFactory::getRegistry()
 {
-    return create(type, nullptr);
+    static QMap<ConnectorType, CreatorFunc> registry;
+    return registry;
+}
+
+void ConnectorFactory::registerConnector(ConnectorType type, CreatorFunc creator)
+{
+    getRegistry()[type] = creator;
 }
 
 std::unique_ptr<DataConnector> ConnectorFactory::create(ConnectorType type, QObject* parent)
 {
-    switch (type) {
-    case ConnectorType::CSV:
-        return std::make_unique<CSVConnector>(parent);
-    case ConnectorType::TXT:
-        return std::make_unique<TXTConnector>(parent);
-    case ConnectorType::EXCEL:
-        return std::make_unique<ExcelConnector>(parent);
-    case ConnectorType::PDF:
-        return std::make_unique<PDFConnector>(parent);
-    case ConnectorType::FEC:
-        return std::make_unique<FECConnector>(parent);
-    case ConnectorType::JSON:
-        return std::make_unique<JSONConnector>(parent);
-    case ConnectorType::SQL:
-        return std::make_unique<SQLConnector>(parent);
-    case ConnectorType::XML:
-        return std::make_unique<XMLConnector>(parent);
-    case ConnectorType::WEB:
-        return std::make_unique<WebConnector>(parent);
-    case ConnectorType::DATABASE:
-        return std::make_unique<SQLConnector>(parent);
-    case ConnectorType::FOLDER:
-    default:
-        qWarning() << "ConnectorFactory: unsupported connector type" << static_cast<int>(type);
-        return nullptr;
+    auto& registry = getRegistry();
+    
+    // If registry is empty, initialize with defaults
+    if (registry.isEmpty()) {
+        registry[ConnectorType::CSV] = [](QObject* p) { return std::make_unique<CSVConnector>(p); };
+        registry[ConnectorType::TXT] = [](QObject* p) { return std::make_unique<TXTConnector>(p); };
+        registry[ConnectorType::EXCEL] = [](QObject* p) { return std::make_unique<ExcelConnector>(p); };
+        registry[ConnectorType::PDF] = [](QObject* p) { return std::make_unique<PDFConnector>(p); };
+        registry[ConnectorType::FEC] = [](QObject* p) { return std::make_unique<FECConnector>(p); };
+        registry[ConnectorType::JSON] = [](QObject* p) { return std::make_unique<JSONConnector>(p); };
+        registry[ConnectorType::SQL] = [](QObject* p) { return std::make_unique<SQLConnector>(p); };
+        registry[ConnectorType::XML] = [](QObject* p) { return std::make_unique<XMLConnector>(p); };
+        registry[ConnectorType::WEB] = [](QObject* p) { return std::make_unique<WebConnector>(p); };
     }
+    
+    auto it = registry.find(type);
+    if (it != registry.end()) {
+        return it.value()(parent);
+    }
+    
+    qWarning() << "ConnectorFactory: unsupported connector type" << static_cast<int>(type);
+    return nullptr;
 }
